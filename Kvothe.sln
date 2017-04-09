@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "luashell", "luashell\luashe
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "luac", "luac\luac.vcxproj", "{8E1813E9-3C72-410A-8C27-93F1F8AE9AF7}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DirectxHost", "DirectxHost\DirectxHost.vcxproj", "{DC8F200B-2988-497E-A438-86D1E0FDE418}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -41,6 +43,14 @@ Global
 		{8E1813E9-3C72-410A-8C27-93F1F8AE9AF7}.Release|x64.Build.0 = Release|x64
 		{8E1813E9-3C72-410A-8C27-93F1F8AE9AF7}.Release|x86.ActiveCfg = Release|Win32
 		{8E1813E9-3C72-410A-8C27-93F1F8AE9AF7}.Release|x86.Build.0 = Release|Win32
+		{DC8F200B-2988-497E-A438-86D1E0FDE418}.Debug|x64.ActiveCfg = Debug|x64
+		{DC8F200B-2988-497E-A438-86D1E0FDE418}.Debug|x64.Build.0 = Debug|x64
+		{DC8F200B-2988-497E-A438-86D1E0FDE418}.Debug|x86.ActiveCfg = Debug|Win32
+		{DC8F200B-2988-497E-A438-86D1E0FDE418}.Debug|x86.Build.0 = Debug|Win32
+		{DC8F200B-2988-497E-A438-86D1E0FDE418}.Release|x64.ActiveCfg = Release|x64
+		{DC8F200B-2988-497E-A438-86D1E0FDE418}.Release|x64.Build.0 = Release|x64
+		{DC8F200B-2988-497E-A438-86D1E0FDE418}.Release|x86.ActiveCfg = Release|Win32
+		{DC8F200B-2988-497E-A438-86D1E0FDE418}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
