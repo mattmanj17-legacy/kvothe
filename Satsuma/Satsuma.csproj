@@ -4,16 +4,15 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{24224DBF-6058-40FF-8F92-4CFC32468BE2}</ProjectGuid>
+    <ProjectGuid>{45F89C25-B5CF-49A6-85C6-AF71727AB3C3}</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>cSharpLIP</RootNamespace>
-    <AssemblyName>cSharpLIP</AssemblyName>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Satsuma</RootNamespace>
+    <AssemblyName>Satsuma</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -23,7 +22,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -31,12 +29,10 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
-  <PropertyGroup>
-    <StartupObject />
-  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -45,13 +41,37 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="packratNestedNameList.cs" />
-    <Compile Include="Deque.cs" />
+    <Compile Include="AStar.cs" />
+    <Compile Include="BellmanFord.cs" />
+    <Compile Include="Bfs.cs" />
+    <Compile Include="CompleteBipartiteGraph.cs" />
+    <Compile Include="CompleteGraph.cs" />
+    <Compile Include="Connectivity.cs" />
+    <Compile Include="ContractedGraph.cs" />
+    <Compile Include="Dfs.cs" />
+    <Compile Include="Dijsktra.cs" />
+    <Compile Include="DisjointSet.cs" />
+    <Compile Include="Drawing.cs" />
+    <Compile Include="Graph.cs" />
+    <Compile Include="IO.cs" />
+    <Compile Include="IO.GraphML.cs" />
+    <Compile Include="Layout.cs" />
+    <Compile Include="Matching.cs" />
+    <Compile Include="MaximumMatching.cs" />
+    <Compile Include="MinimumCostMatching.cs" />
+    <Compile Include="NetworkSimplex.cs" />
+    <Compile Include="Path.cs" />
+    <Compile Include="Preflow.cs" />
+    <Compile Include="PriorityQueue.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Utility.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="App.config" />
+    <Compile Include="RedirectedGraph.cs" />
+    <Compile Include="ReverseGraph.cs" />
+    <Compile Include="SpanningForest.cs" />
+    <Compile Include="Subgraph.cs" />
+    <Compile Include="Supergraph.cs" />
+    <Compile Include="Tsp.cs" />
+    <Compile Include="UndirectedGraph.cs" />
+    <Compile Include="Utils.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
