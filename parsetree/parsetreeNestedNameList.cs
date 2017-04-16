@@ -10,6 +10,8 @@ using System.Linq;
 	element: NAME '=' NAME | NAME | list
 */
 
+// TODO!!!!!!!!!!!!! do tokenizerbase and parser base. trying to have them be the same thing is messy
+
 namespace NestedNameList
 {
 
