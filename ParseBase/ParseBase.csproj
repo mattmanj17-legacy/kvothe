@@ -41,9 +41,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Deque.cs" />
+    <Compile Include="NestedNameList.cs" />
     <Compile Include="ParserBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TokenizerBase.cs" />
     <Compile Include="Utility.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
