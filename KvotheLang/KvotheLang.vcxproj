@@ -141,6 +141,16 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="alloc.h" />
+    <ClInclude Include="ary.h" />
+    <ClInclude Include="assert.h" />
+    <ClInclude Include="enum.h" />
+    <ClInclude Include="macromisc.h" />
+    <ClInclude Include="stb_malloc.h" />
+    <ClInclude Include="string.h" />
+    <ClInclude Include="types.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
