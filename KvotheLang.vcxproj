@@ -18,6 +18,19 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="KvotheLang\alloc.h" />
+    <ClInclude Include="KvotheLang\ary.h" />
+    <ClInclude Include="KvotheLang\assert.h" />
+    <ClInclude Include="KvotheLang\enum.h" />
+    <ClInclude Include="KvotheLang\macromisc.h" />
+    <ClInclude Include="KvotheLang\stb_malloc.h" />
+    <ClInclude Include="KvotheLang\string.h" />
+    <ClInclude Include="KvotheLang\types.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="KvotheLang\main.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{FCC058E6-590A-4FAF-8CDC-E42F4020EF73}</ProjectGuid>
@@ -72,6 +85,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)\bin\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)\temp\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -138,19 +153,6 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="alloc.h" />
-    <ClInclude Include="ary.h" />
-    <ClInclude Include="assert.h" />
-    <ClInclude Include="enum.h" />
-    <ClInclude Include="macromisc.h" />
-    <ClInclude Include="stb_malloc.h" />
-    <ClInclude Include="string.h" />
-    <ClInclude Include="types.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

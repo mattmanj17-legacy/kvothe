@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include "alloc.h"
+
 template <typename T>
 class CAry // tag = ary
 {
@@ -63,9 +65,9 @@ public:
 			CDynAry<T> & operator= (const CDynAry & rhs);
 
 	void	Append(const T t);
-	void	Append(const Type * pTArray, size_t cT);
-	void	AppendFill(size_t c, const Type t);
-	T *		AppendNew()
+	void	Append(const T * pTArray, size_t cT);
+	void	AppendFill(size_t c, const T t);
+	T *		AppendNew();
 };
 
 // fixed sized array container template
