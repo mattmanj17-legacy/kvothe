@@ -532,11 +532,11 @@ struct SExpression
 
 	// EXPRK_Int
 
-	int m_n;
+	unsigned int m_n;
 
 	// EXPRK_Id
 
-	int m_iGlobal;
+	unsigned int m_iGlobal;
 
 	void PrintDebug()
 	{
