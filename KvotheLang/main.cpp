@@ -6,10 +6,14 @@
 #include <assert.h>
 #include <memory>
 
+#include <iostream>
+
 using std::string;
 using std::stack;
 using std::vector;
 using std::shared_ptr;
+using std::cout;
+using std::endl;
 
 // Tiny C
 // http://www.iro.umontreal.ca/~felipe/IFT2030-Automne2002/Complements/tinyc.c
@@ -452,7 +456,7 @@ struct SParser
 
 		if (TokkCur() == TOKK_INT) { pNode->AddChild(PNodeTokConsume(TOKK_INT)); }  // ID
 		else if (TokkCur() == TOKK_ID) { pNode->AddChild(PNodeTokConsume(TOKK_ID)); } // INT
-		else if (TokkCur() == TOKK_RPAREN) { pNode->AddChild(PNodeParenExprNext()); } // parenExpr
+		else if (TokkCur() == TOKK_LPAREN) { pNode->AddChild(PNodeParenExprNext()); } // parenExpr
 		else
 		{
 			assert(false); // no viable alt
@@ -523,8 +527,8 @@ struct SExpression
 	// EXPRK_Binop
 
 	BINOPK m_binopk;
-	SExpression * m_pExprLeft;
-	SExpression * m_pExprRight;
+	SExpression * m_pExprLeft = nullptr;
+	SExpression * m_pExprRight = nullptr;
 
 	// EXPRK_Int
 
@@ -533,6 +537,44 @@ struct SExpression
 	// EXPRK_Id
 
 	int m_iGlobal;
+
+	void PrintDebug()
+	{
+		assert(m_exprk != EXPRK_Nil);
+		
+		switch (m_exprk)
+		{
+			case EXPRK_Binop:
+				assert(m_binopk != BINOPK_Nil);
+				cout << "(";
+				switch (m_binopk)
+				{
+					case BINOPK_LT: 
+						cout << "<";
+						break;
+					case BINOPK_PLUS: 
+						cout << "+";
+						break;
+					case BINOPK_SUB:
+						cout << "-";
+						break;
+				}
+				cout << " ";
+				m_pExprLeft->PrintDebug();
+				cout << " ";
+				m_pExprRight->PrintDebug();
+				cout << ")";
+				break;
+			case EXPRK_Int: 
+				cout << m_n;
+				break;
+			case EXPRK_Id: 
+				cout << (char)(m_iGlobal + 'a');
+				break;
+			default:
+				break;
+		}
+	}
 };
 
 // statement kind
@@ -564,17 +606,68 @@ struct SStatement
 
 	// STATK_If
 	
-	SStatement * m_pStatElse;
+	SStatement * m_pStatElse = nullptr;
 
 	// STATK_If / STATK_While / STATK_DoWhile
 
-	SExpression * m_pExprCondition;
-	SStatement * m_pStatBody;
+	SExpression * m_pExprCondition = nullptr;
+	SStatement * m_pStatBody = nullptr;
 
 	// STATK_Assign
 		
-	SExpression * m_pId; // must be EXPRK_Id
-	SExpression * m_pExpr;
+	SExpression * m_pId = nullptr; // must be EXPRK_Id
+	SExpression * m_pExpr = nullptr;
+
+	void PrintDebug()
+	{
+		assert(m_statk != STATK_Nil);
+		
+		switch (m_statk)
+		{
+			case STATK_Statements:
+				cout << "(";
+				for(unsigned int i = 0; i < m_aryPStat.size(); ++i)
+				{
+					if(i != 0) cout << " ";
+					m_aryPStat[i]->PrintDebug();
+				}
+				cout << ")";
+				break;
+			case STATK_If:
+				cout << "(ifelse ";
+				m_pExprCondition->PrintDebug();
+				cout << " ";
+				m_pStatBody->PrintDebug();
+				if(m_pStatElse)
+				{
+					cout << " ";
+					m_pStatElse->PrintDebug();
+				}
+				cout << ")";
+				break;
+			case STATK_While:
+				cout << "(while ";
+				m_pExprCondition->PrintDebug();
+				cout << " ";
+				m_pStatBody->PrintDebug();
+				cout << ")";
+				break;
+			case STATK_DoWhile:
+				cout << "(dowhile ";
+				m_pStatBody->PrintDebug();
+				cout << " ";
+				m_pExprCondition->PrintDebug();
+				cout << ")";
+				break;
+			case STATK_Assign:
+				cout << "(= ";
+				m_pId->PrintDebug();
+				cout << " ";
+				m_pExpr->PrintDebug();
+				cout << ")";
+				break;
+		}
+	}
 };
 
 // the AST
@@ -822,6 +915,8 @@ int main()
 	SAst ast;
 
 	SStatement * pStat = ast.PStatFromPNode(pNode);
+
+	pStat->PrintDebug();
 
 	return 0;
 }
