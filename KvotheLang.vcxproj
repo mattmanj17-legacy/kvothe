@@ -23,13 +23,17 @@
     <ClInclude Include="KvotheLang\ary.h" />
     <ClInclude Include="KvotheLang\assert.h" />
     <ClInclude Include="KvotheLang\enum.h" />
-    <ClInclude Include="KvotheLang\macromisc.h" />
+    <ClInclude Include="KvotheLang\lang.h" />
     <ClInclude Include="KvotheLang\stb_malloc.h" />
     <ClInclude Include="KvotheLang\string.h" />
     <ClInclude Include="KvotheLang\types.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="KvotheLang\alloc.cpp" />
+    <ClCompile Include="KvotheLang\ary.cpp" />
+    <ClCompile Include="KvotheLang\lang.cpp" />
     <ClCompile Include="KvotheLang\main.cpp" />
+    <ClCompile Include="KvotheLang\stb_malloc.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

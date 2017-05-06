@@ -17,61 +17,48 @@
 
 #include "alloc.h"
 
-template <typename T>
-class CAry // tag = ary
-{
-public:
-
-	class CIterator // tag = iter
-	{
-	public:
-			CIterator(CAry<T> * pAry);
-
-		T * Next();
-
-	private:
-		T * m_pCur;
-		T * m_pEnd;
-	};
-
-				CAry(BK bk = BK_Nil);
-				CAry(T * a, s32 c, s32 cMax, BK bk = BK_Nil);
-				CAry(const CAry&) = delete;
-				CAry & operator=(const CAry&) = delete;
-
-	const T &	operator[](size_t i) const;
-	T &			operator[](size_t i);
-
-	size_t		C() const;
-
-	// for range based for
-	// BB (matthewd) return a CIterator?
-
-	T *			begin();
-	T *			end();
-
-private:
-};
-
 // resizable array (aka std::vector)
+
 template <typename T>
 class CDynAry : public CAry<T> //tag = dary
 {
 public:
-			CDynAry(CAlloc * pAlloc, BK bk, s32 cMaxStarting = 16);
-			CDynAry(BK bk = BK_Nil);
-			~CDynAry();
-			CDynAry(const CDynAry & rhs);
-			CDynAry<T> & operator= (const CDynAry & rhs);
+				CDynAry();
+				~CDynAry();
+				CDynAry(const CAry&) = delete;
+				CDynAry & operator=(const CAry&) = delete;
 
-	void	Append(const T t);
-	void	Append(const T * pTArray, size_t cT);
-	void	AppendFill(size_t c, const T t);
-	T *		AppendNew();
-};
+	void		EnsureCapacity(size_t cMax);
 
-// fixed sized array container template
-template <typename T, int C_MAX>
-class CFixAry : public CAry<T> // tag = fary
-{
+	const T &	operator[](size_t i) const;
+	T &			operator[](size_t i);
+
+	T *			A()
+					{ return m_a; }
+	const T*	A() const
+					{ return m_a; }
+
+	size_t		C() const
+					{ return m_c; }
+	size_t		CMax() const
+					{ return m_cMax; }
+	bool		FIsEmpty() const
+					{ return m_c == 0; }
+
+	size_t		IFind(const T * p) const;
+
+	T *			begin()
+					{ return m_a; }
+	T *			end()
+					{ return m_a + m_c; }
+
+	void		Clear();
+
+	void		Append(const T & t);
+	T *			AppendNew();
+
+private:
+	T * m_a;
+	size_t m_c;
+	size_t m_cMax;
 };

@@ -22,8 +22,8 @@
 class CString // tag=str
 {
 public:
-	static void		StaticInit(CAlloc * pAlloc);
-	static void		StaticShutdown(CAlloc * pAlloc);
+	static void		StaticInit(CAllocHeap * pAlloc);
+	static void		StaticShutdown(CAllocHeap * pAlloc);
 
 	CString();
 	CString(const char * pChz);

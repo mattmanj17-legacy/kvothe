@@ -27,9 +27,6 @@
     <ClInclude Include="KvotheLang\enum.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="KvotheLang\macromisc.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="KvotheLang\stb_malloc.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -39,9 +36,24 @@
     <ClInclude Include="KvotheLang\types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="KvotheLang\lang.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="KvotheLang\main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="KvotheLang\lang.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="KvotheLang\stb_malloc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="KvotheLang\alloc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="KvotheLang\ary.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

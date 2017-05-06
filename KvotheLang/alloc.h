@@ -17,45 +17,37 @@
 
 #include "enum.h"
 #include "stb_malloc.h"
-#include "macromisc.h"
 
-// Allocator
-enum BK // block kind
-{
-	MAX_MIN_NIL(BK)
-};
-
-#define ALLOC(numBytes, alignment) 			AllocImpl(numBytes, alignment, __FILE__, __LINE__)
-#define ALLOC_BK(numBytes, alignment, bk) 	AllocImpl(numBytes, alignment, __FILE__, __LINE__, bk)
-#define ALLOC_TYPE(TYPE_NAME) 				AllocImpl(sizeof(TYPE_NAME), ALIGN_OF(TYPE_NAME), __FILE__, __LINE__)
-#define ALLOC_TYPE_ARRAY(TYPE_NAME, C_MAX) 	AllocImpl(sizeof(TYPE_NAME) * C_MAX, ALIGN_OF(TYPE_NAME), __FILE__, __LINE__)
-#define FREE(P) 							FreeImpl(P, __FILE__, __LINE__)
-#define NEW(PALLOC, TYPE_NAME)				new ( (PALLOC)->AllocImpl(sizeof(TYPE_NAME), ALIGN_OF(TYPE_NAME), __FILE__, __LINE__))
-#define DELETE(P) 							DeleteImpl(P, __FILE__, __LINE__)
-
-void * STBM_CALLBACK SystemAlloc(void * pUserContext, size_t cBRequested, size_t * pCbProvided);
-void STBM_CALLBACK SystemFree(void * pUserContext, void *p);
+#define ALLOC(cByte, cByteAlign) 			(CAllocHeap::PHallocDefault())->AllocImpl(cByte, cByteAlign, __FILE__, __LINE__)
+#define FREE(p) 							(CAllocHeap::PHallocDefault())->FreeImpl(p, __FILE__, __LINE__)
+#define NEW(T, ...)							new ((CAllocHeap::PHallocDefault())->AllocImpl(sizeof(T), ALIGN_OF(T), __FILE__, __LINE__)) T(__VA_ARGS__)
+#define DELETE(p) 							(CAllocHeap::PHallocDefault())->DeleteImpl(p, __FILE__, __LINE__)
 
 // BB (matthewd) need to impliment allocation tracking 
 
-class CAlloc // tag = alloc
+// BB (matthewd) need to impliment block kinds...
+
+class CAllocHeap // tag = halloc
 {
 public:
-				CAlloc();
-				CAlloc(void * pBuffer, size_t cB);
-				~CAlloc();
+					CAllocHeap(size_t cByte);
+					~CAllocHeap();
 
-	void		Initialize(void * pB, size_t cB);
-	void		Shutdown();
-	static void	StaticShutdown();
-
-	void *		AllocImpl(size_t cB, size_t cBAlign, const char* pChzFile, int cLine, BK bk = BK_Nil);
-	void		FreeImpl(void * pV, const char * pChzFile, int cLine);
+	void *			AllocImpl(size_t cByte, size_t cByteAlign, const char* pChzFile, int nLine);
+	void			FreeImpl(void * p, const char * pChzFile, int nLine);
 	
 	template <typename T> 
-	void		DeleteImpl(T * p, const char * pChzFile, int cLine);
+	void			DeleteImpl(T * p, const char * pChzFile, int nLine);
+
+	static void		SetPHallocDefault(CAllocHeap* pHallocDefault)
+						{ s_pHallocDefault = pHallocDefault; }
+	static CAllocHeap*	PHallocDefault()
+						{ return s_pHallocDefault; }
 
 private:
+	stbm_heap*	m_pStbheap;
+	static CAllocHeap* s_pHallocDefault;
+	u8 * m_aByte;
 };
 
 
