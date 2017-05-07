@@ -86,7 +86,6 @@ enum TOKK
 enum RULEK
 {
 	RULEK_NIL,
-	RULEK_ERR,
 	RULEK_Atom,
 	RULEK_Sum,
 	RULEK_TestExpr,
@@ -122,7 +121,7 @@ struct SParseNode // tag = node
 	, m_tokk(TOKK_NIL)
 	, m_str()
 	{
-		m_fHasError = m_rulek == RULEK_ERR;
+		m_fHasError = false;
 	}
 
 	SParseNode(TOKK tokk)
@@ -157,6 +156,111 @@ struct SParseNode // tag = node
 	int CChild()
 	{
 		return m_aryPNodeChild.size();
+	}
+
+	void PrintDebug()
+	{
+		assert(m_rulek != RULEK_NIL || m_tokk != TOKK_NIL);
+
+		if(m_rulek != RULEK_NIL)
+		{
+			printf("(");
+
+			if(m_fHasError)
+			{
+				printf("ERROR ");
+			}
+
+			switch (m_rulek)
+			{
+				case RULEK_Atom:
+				printf("RULEK_Atom");
+				break;
+				case RULEK_Sum:
+				printf("RULEK_Sum");
+				break;
+				case RULEK_TestExpr:
+				printf("RULEK_TestExpr");
+				break;
+				case RULEK_ParenExpr:
+				printf("RULEK_ParenExpr");
+				break;
+				case RULEK_Statement:
+				printf("RULEK_Statement");
+				break;
+				case RULEK_Program:
+				printf("RULEK_Program");
+				break;
+				default:
+				assert(false);
+				break;
+			}
+
+			for(SParseNode * pNode : m_aryPNodeChild)
+			{
+				printf(" ");
+				pNode->PrintDebug();
+			}
+
+			printf(")");
+		}
+		else
+		{
+			switch (m_tokk)
+			{
+				case TOKK_INT:
+				printf("TOKK_INT");
+				break;
+				case TOKK_ID:
+				printf("TOKK_ID");
+				break;
+				case TOKK_PLUS:
+				printf("TOKK_PLUS");
+				break;
+				case TOKK_SUB:
+				printf("TOKK_SUB");
+				break;
+				case TOKK_LT:
+				printf("TOKK_LT");
+				break;
+				case TOKK_LPAREN:
+				printf("TOKK_LPAREN");
+				break;
+				case TOKK_RPAREN:
+				printf("TOKK_RPAREN");
+				break;
+				case TOKK_EQUALS:
+				printf("TOKK_EQUALS");
+				break;
+				case TOKK_LBRACE:
+				printf("TOKK_LBRACE");
+				break;
+				case TOKK_RBRACE:
+				printf("TOKK_RBRACE");
+				break;
+				case TOKK_DO:
+				printf("TOKK_DO");
+				break;
+				case TOKK_WHILE:
+				printf("TOKK_WHILE");
+				break;
+				case TOKK_IF:
+				printf("TOKK_IF");
+				break;
+				case TOKK_ELSE:
+				printf("TOKK_ELSE");
+				break;
+				case TOKK_SEMICOLON:
+				printf("TOKK_SEMICOLON");
+				break;
+				case TOKK_ERR:
+				printf("TOKK_ERR");
+				break;
+				default:
+				assert(false);
+				break;
+			}
+		}
 	}
 	
 	vector<SParseNode *>	m_aryPNodeChild;
@@ -314,10 +418,10 @@ struct STokenizer // tag = tokenizer
 };
 
 // if we failed to syncronise (we are at the end of input), bail out
-#define CheckPNodeSynced(pNode) if (pNode->m_fHasError && TokkCur() == TOKK_EOI) { pNode->m_tokk = TOKK_ERR; pNode->m_rulek = RULEK_ERR; return pNode; } else { pNode->m_fHasError = false; }
+#define CheckPNodeSynced(pNode) if (pNode->m_fHasError && TokkCur() == TOKK_EOI) { return pNode; } else { pNode->m_fHasError = false; }
 
 // if we are not sycronizing this node, and there was an error, turn this node into an error node so the error can be handled up the call stack
-#define CheckPNodeUnsynced(pNode) if (pNode->m_fHasError) { pNode->m_tokk = TOKK_ERR; pNode->m_rulek = RULEK_ERR; return pNode; }
+#define CheckPNodeUnsynced(pNode) if (pNode->m_fHasError) { return pNode; }
 
 struct SParser
 {
@@ -397,9 +501,6 @@ struct SParser
 			// RULEK_NIL
 			{nullptr, 0},
 
-			//RULEK_ERR
-			{nullptr, 0},
-
 			//RULEK_Atom
 			{s_aTokkFirstAtom, DIM(s_aTokkFirstAtom)},
 
@@ -443,15 +544,11 @@ struct SParser
 
 	SParseNode * PNodeNext(RULEK rulek, RULEK rulekSync = RULEK_NIL)
 	{
-		assert(rulek > RULEK_ERR);
-		assert(rulekSync != RULEK_ERR);
+		assert(rulek != RULEK_NIL);
 		
 		const FuncPNodeNext s_mpRulekFuncPNodeNext[] =
 		{
 			//RULEK_NIL,
-			nullptr,
-
-			//RULEK_ERR,
 			nullptr,
 
 			//RULEK_Atom,
@@ -481,7 +578,7 @@ struct SParser
 
 		// if we failed to parse rulek, sync to the sync rule if provided
 		
-		if(pNode->m_rulek == RULEK_ERR)
+		if(pNode->m_fHasError)
 		{
 			if(rulekSync != RULEK_NIL)
 				SyncTo(rulekSync);
@@ -492,7 +589,7 @@ struct SParser
 
 	SParseNode * PNodeNext(RULEK rulek, TOKK tokkSync)
 	{
-		assert(rulek > RULEK_ERR);
+		assert(rulek != RULEK_NIL);
 		assert(tokkSync != TOKK_ERR);
 
 		SParseNode * pNode = PNodeNext(rulek);
@@ -500,7 +597,7 @@ struct SParser
 
 		// if we failed to parse rulek, sync to the sync token if provided
 
-		if(pNode->m_rulek == RULEK_ERR)
+		if(pNode->m_fHasError)
 		{
 			if(tokkSync != TOKK_NIL)
 				SyncTo(tokkSync);
@@ -512,7 +609,6 @@ struct SParser
 	SParseNode * PNodeNext(TOKK tokk, RULEK rulekSync = RULEK_NIL)
 	{
 		assert(tokk > TOKK_ERR);
-		assert(rulekSync != RULEK_ERR);
 
 		SParseNode * pNode = PNodeTokConsume();
 		assert(pNode);
@@ -679,8 +775,6 @@ struct SParser
 		else
 		{
 			pNode->m_fHasError = true;
-			pNode->m_tokk = TOKK_ERR;
-			pNode->m_rulek = RULEK_ERR;
 			printf("parse error : no viable alt");
 		}
 
@@ -888,7 +982,7 @@ struct SExpression
 		{
 			case EXPRK_Binop:
 				assert(m_binopk != BINOPK_Nil);
-				printf("(");
+				printf("( ");
 				switch (m_binopk)
 				{
 					case BINOPK_LT: 
@@ -905,7 +999,7 @@ struct SExpression
 				m_pExprLeft->PrintDebug();
 				printf(" ");
 				m_pExprRight->PrintDebug();
-				printf(")");
+				printf(" )");
 				break;
 			case EXPRK_Int: 
 				printf("%d", m_n);
@@ -967,46 +1061,47 @@ struct SStatement
 		switch (m_statk)
 		{
 			case STATK_Statements:
-				printf("(");
+				printf("( ");
 				for(unsigned int i = 0; i < m_aryPStat.size(); ++i)
 				{
-					if(i != 0) printf(" ");
 					m_aryPStat[i]->PrintDebug();
+					printf(" ");
 				}
 				printf(")");
 				break;
 			case STATK_If:
-				printf("(ifelse ");
+				printf("( ifelse ");
 				m_pExprCondition->PrintDebug();
 				printf(" ");
 				m_pStatBody->PrintDebug();
+				printf(" ");
 				if(m_pStatElse)
 				{
-					printf(" ");
 					m_pStatElse->PrintDebug();
+					printf(" ");
 				}
 				printf(")");
 				break;
 			case STATK_While:
-				printf("(while ");
+				printf("( while ");
 				m_pExprCondition->PrintDebug();
 				printf(" ");
 				m_pStatBody->PrintDebug();
-				printf(")");
+				printf(" )");
 				break;
 			case STATK_DoWhile:
-				printf("(dowhile ");
+				printf("( dowhile ");
 				m_pStatBody->PrintDebug();
 				printf(" ");
 				m_pExprCondition->PrintDebug();
-				printf(")");
+				printf(" )");
 				break;
 			case STATK_Assign:
-				printf("(= ");
+				printf("( = ");
 				m_pId->PrintDebug();
 				printf(" ");
 				m_pExpr->PrintDebug();
-				printf(")");
+				printf(" )");
 				break;
 		}
 	}
@@ -1254,11 +1349,15 @@ int main()
 
 	SParseNode * pNode = parser.PNodeProgNext();
 
+	pNode->PrintDebug();
+
 	if(pNode->m_fHasError) return 0;
 
 	SAst ast;
 
 	SStatement * pStat = ast.PStatFromPNode(pNode);
+
+	printf("\n\n\n");
 
 	pStat->PrintDebug();
 
