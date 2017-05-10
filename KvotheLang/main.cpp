@@ -29,7 +29,7 @@ using std::function;
 		| 'while' paren_expr statement
 		| 'do' statement 'while' paren_expr ';'
 		| '{' statement* '}'
-		| ID '=' atom ';'
+		| ID '=' testExpr ';'
 		;
 
 	parenExpr
@@ -57,42 +57,38 @@ using std::function;
 	INT : [0-9]+
 */
 
-// token kind
+// parse node kind (both tokens and rules)
 
-enum TOKK
+enum NODEK
 {
-	TOKK_NIL,
-	TOKK_ERR,
-	TOKK_EOI,
-	TOKK_INT,
-	TOKK_ID,
-	TOKK_PLUS,
-	TOKK_SUB,
-	TOKK_LT,
-	TOKK_LPAREN,
-	TOKK_RPAREN,
-	TOKK_EQUALS,
-	TOKK_LBRACE,
-	TOKK_RBRACE,
-	TOKK_DO,
-	TOKK_WHILE,
-	TOKK_IF,
-	TOKK_ELSE,
-	TOKK_SEMICOLON,
-};
+	NODEK_NIL,
+	NODEK_EOI,
+	NODEK_INT,
+	NODEK_ID,
+	NODEK_PLUS,
+	NODEK_SUB,
+	NODEK_LT,
+	NODEK_LPAREN,
+	NODEK_RPAREN,
+	NODEK_EQUALS,
+	NODEK_LBRACE,
+	NODEK_RBRACE,
+	NODEK_DO,
+	NODEK_WHILE,
+	NODEK_IF,
+	NODEK_ELSE,
+	NODEK_SEMICOLON,
 
-// rule kind
+	NODEK_TOKMAX,
 
-enum RULEK
-{
-	RULEK_NIL,
-	RULEK_Atom,
-	RULEK_Sum,
-	RULEK_TestExpr,
-	RULEK_ParenExpr,
-	RULEK_Statement,
-	RULEK_Program,
-	RULEK_Max,
+	NODEK_Atom = NODEK_TOKMAX,
+	NODEK_Sum,
+	NODEK_TestExpr,
+	NODEK_ParenExpr,
+	NODEK_Statement,
+	NODEK_Program,
+
+	NODEK_Max,
 };
 
 // http://stackoverflow.com/a/6256085
@@ -116,40 +112,23 @@ struct Bad_arg_to_DIM {
 
 struct SParseNode // tag = node
 {
-	SParseNode(RULEK rulek)
-	: m_rulek(rulek)
-	, m_tokk(TOKK_NIL)
-	, m_str()
-	{
-		m_fHasError = false;
-	}
-
-	SParseNode(TOKK tokk)
-	: m_rulek(RULEK_NIL)
-	, m_tokk(tokk)
-	, m_str()
-	{
-		m_fHasError = m_tokk == TOKK_ERR;
-	}
-
-	SParseNode(TOKK tokk, string str)
-	: m_rulek(RULEK_NIL)
-	, m_tokk(tokk)
+	SParseNode(NODEK nodek, string str = "")
+	: m_aryPNodeChild() 
+	, m_nodek(nodek)
 	, m_str(str)
 	{
-		m_fHasError = m_tokk == TOKK_ERR;
+		assert(m_nodek < NODEK_TOKMAX || m_str.size() == 0);
 	}
 
 	void AddChild(SParseNode * pNodeChild)
 	{
+		assert(m_nodek >= NODEK_TOKMAX);
 		m_aryPNodeChild.push_back(pNodeChild);
-
-		if(pNodeChild->m_fHasError)
-			m_fHasError = true;
 	}
 
 	SParseNode * PNodeChild(int nChild)
 	{
+		assert(nChild < m_aryPNodeChild.size() && nChild >= 0);
 		return m_aryPNodeChild[nChild];
 	}
 
@@ -160,36 +139,33 @@ struct SParseNode // tag = node
 
 	void PrintDebug()
 	{
-		assert(m_rulek != RULEK_NIL || m_tokk != TOKK_NIL);
+		assert(m_nodek != NODEK_NIL);
 
-		if(m_rulek != RULEK_NIL)
+		if(m_nodek < NODEK_TOKMAX)
 		{
+			assert(m_str.size() == 0);
+
 			printf("(");
 
-			if(m_fHasError)
+			switch (m_nodek)
 			{
-				printf("ERROR ");
-			}
-
-			switch (m_rulek)
-			{
-				case RULEK_Atom:
-				printf("RULEK_Atom");
+				case NODEK_Atom:
+				printf("Atom");
 				break;
-				case RULEK_Sum:
-				printf("RULEK_Sum");
+				case NODEK_Sum:
+				printf("Sum");
 				break;
-				case RULEK_TestExpr:
-				printf("RULEK_TestExpr");
+				case NODEK_TestExpr:
+				printf("TestExpr");
 				break;
-				case RULEK_ParenExpr:
-				printf("RULEK_ParenExpr");
+				case NODEK_ParenExpr:
+				printf("ParenExpr");
 				break;
-				case RULEK_Statement:
-				printf("RULEK_Statement");
+				case NODEK_Statement:
+				printf("Statement");
 				break;
-				case RULEK_Program:
-				printf("RULEK_Program");
+				case NODEK_Program:
+				printf("Program");
 				break;
 				default:
 				assert(false);
@@ -206,92 +182,80 @@ struct SParseNode // tag = node
 		}
 		else
 		{
-			switch (m_tokk)
+			assert(m_aryPNodeChild.size() == 0);
+			
+			switch (m_nodek)
 			{
-				case TOKK_INT:
-				printf("TOKK_INT");
+				case NODEK_INT:
+				printf("INT");
 				break;
-				case TOKK_ID:
-				printf("TOKK_ID");
+				case NODEK_ID:
+				printf("ID");
 				break;
-				case TOKK_PLUS:
-				printf("TOKK_PLUS");
+				case NODEK_PLUS:
+				printf("PLUS");
 				break;
-				case TOKK_SUB:
-				printf("TOKK_SUB");
+				case NODEK_SUB:
+				printf("SUB");
 				break;
-				case TOKK_LT:
-				printf("TOKK_LT");
+				case NODEK_LT:
+				printf("LT");
 				break;
-				case TOKK_LPAREN:
-				printf("TOKK_LPAREN");
+				case NODEK_LPAREN:
+				printf("LPAREN");
 				break;
-				case TOKK_RPAREN:
-				printf("TOKK_RPAREN");
+				case NODEK_RPAREN:
+				printf("RPAREN");
 				break;
-				case TOKK_EQUALS:
-				printf("TOKK_EQUALS");
+				case NODEK_EQUALS:
+				printf("EQUALS");
 				break;
-				case TOKK_LBRACE:
-				printf("TOKK_LBRACE");
+				case NODEK_LBRACE:
+				printf("LBRACE");
 				break;
-				case TOKK_RBRACE:
-				printf("TOKK_RBRACE");
+				case NODEK_RBRACE:
+				printf("RBRACE");
 				break;
-				case TOKK_DO:
-				printf("TOKK_DO");
+				case NODEK_DO:
+				printf("DO");
 				break;
-				case TOKK_WHILE:
-				printf("TOKK_WHILE");
+				case NODEK_WHILE:
+				printf("WHILE");
 				break;
-				case TOKK_IF:
-				printf("TOKK_IF");
+				case NODEK_IF:
+				printf("IF");
 				break;
-				case TOKK_ELSE:
-				printf("TOKK_ELSE");
+				case NODEK_ELSE:
+				printf("ELSE");
 				break;
-				case TOKK_SEMICOLON:
-				printf("TOKK_SEMICOLON");
-				break;
-				case TOKK_ERR:
-				printf("TOKK_ERR");
+				case NODEK_SEMICOLON:
+				printf("SEMICOLON");
 				break;
 				default:
 				assert(false);
 				break;
 			}
+
+			if(m_str.size() > 0)
+			{
+				printf(" '%s'", m_str.c_str());
+			}
 		}
 	}
 	
-	vector<SParseNode *>	m_aryPNodeChild;
+	vector<SParseNode *>			m_aryPNodeChild;
 
-	RULEK							m_rulek;
-	TOKK							m_tokk;
+	NODEK							m_nodek;
 	string							m_str;
-	bool							m_fHasError;
 };
 
 // parse tree
 
 struct SParseTree // tag = parsetree
 {
-	SParseNode *	PNodeCreate(RULEK rulek)
+	SParseNode *	PNodeCreate(NODEK nodek, string str = "")
 	{
-		shared_ptr<SParseNode> pNode(new SParseNode(rulek));
-		m_aryPNode.push_back(pNode);
-		return pNode.get();
-	}
-
-	SParseNode *	PNodeCreate(TOKK tokk)
-	{
-		shared_ptr<SParseNode> pNode(new SParseNode(tokk));
-		m_aryPNode.push_back(pNode);
-		return pNode.get();
-	}
-
-	SParseNode *	PNodeCreate(TOKK tokk, string str)
-	{
-		shared_ptr<SParseNode> pNode(new SParseNode(tokk, str));
+		shared_ptr<SParseNode> pNode(new SParseNode(nodek, str));
 		m_aryPNode.push_back(pNode);
 		return pNode.get();
 	}
@@ -316,7 +280,7 @@ struct STokenizer // tag = tokenizer
 		{
 			char chrCur = m_strInput[m_iChrCur];
 			if (isspace(chrCur)) { ++m_iChrCur; } // skip whitespace
-			else if (isdigit(chrCur)) // TOKK_INT
+			else if (isdigit(chrCur)) // NODEK_INT
 			{
 				string strInt = "";
 
@@ -327,7 +291,7 @@ struct STokenizer // tag = tokenizer
 					chrCur = m_strInput[m_iChrCur];
 				} while (isdigit(chrCur) && m_iChrCur < m_strInput.length());
 
-				return m_parsetree.PNodeCreate(TOKK_INT, strInt);
+				return m_parsetree.PNodeCreate(NODEK_INT, strInt);
 			}
 			else if (isalpha(chrCur)) // keyword or ID
 			{
@@ -340,45 +304,42 @@ struct STokenizer // tag = tokenizer
 					chrCur = m_strInput[m_iChrCur];
 				} while (isalpha(chrCur) && m_iChrCur < m_strInput.length());
 
-				TOKK tokkKeyword = TokkKeywordFromString(strToken);
-				if (tokkKeyword != TOKK_NIL) // keyword
+				NODEK nodekTokKeyword = NodekTokKeywordFromString(strToken);
+				if (nodekTokKeyword != NODEK_NIL) // keyword
 				{
-					return m_parsetree.PNodeCreate(tokkKeyword);
+					return m_parsetree.PNodeCreate(nodekTokKeyword, strToken);
 				}
-				else if (strToken.length() == 1) // TOKK_Id
+				else if (strToken.length() == 1) // NODEK_Id
 				{
 					if (isupper(chrCur))
 					{
-						printf("lex error: expected a lowercase letter, but got uppercase letter '%c'\n", chrCur);
-						return  m_parsetree.PNodeCreate(TOKK_ERR);
+						assert(false);
 					}
 					else
 					{
-						return m_parsetree.PNodeCreate(TOKK_ID, strToken);
+						return m_parsetree.PNodeCreate(NODEK_ID, strToken);
 					}
 				}
 				else
 				{
-					printf("lex error: expected keyword or ID, but got '%s'\n", strToken.c_str());
-					return  m_parsetree.PNodeCreate(TOKK_ERR);
+					assert(false);
 				}
 			}
-			else if (chrCur == '+') { ++m_iChrCur; return m_parsetree.PNodeCreate(TOKK_PLUS); }
-			else if (chrCur == '-') { ++m_iChrCur; return m_parsetree.PNodeCreate(TOKK_SUB); }
-			else if (chrCur == '<') { ++m_iChrCur; return m_parsetree.PNodeCreate(TOKK_LT); }
-			else if (chrCur == '(') { ++m_iChrCur; return m_parsetree.PNodeCreate(TOKK_LPAREN); }
-			else if (chrCur == ')') { ++m_iChrCur; return m_parsetree.PNodeCreate(TOKK_RPAREN); }
-			else if (chrCur == '=') { ++m_iChrCur; return m_parsetree.PNodeCreate(TOKK_EQUALS); }
-			else if (chrCur == '{') { ++m_iChrCur; return m_parsetree.PNodeCreate(TOKK_LBRACE); }
-			else if (chrCur == '}') { ++m_iChrCur; return m_parsetree.PNodeCreate(TOKK_RBRACE); }
-			else if (chrCur == ';') { ++m_iChrCur; return m_parsetree.PNodeCreate(TOKK_SEMICOLON); }
+			else if (chrCur == '+') { ++m_iChrCur; return m_parsetree.PNodeCreate(NODEK_PLUS); }
+			else if (chrCur == '-') { ++m_iChrCur; return m_parsetree.PNodeCreate(NODEK_SUB); }
+			else if (chrCur == '<') { ++m_iChrCur; return m_parsetree.PNodeCreate(NODEK_LT); }
+			else if (chrCur == '(') { ++m_iChrCur; return m_parsetree.PNodeCreate(NODEK_LPAREN); }
+			else if (chrCur == ')') { ++m_iChrCur; return m_parsetree.PNodeCreate(NODEK_RPAREN); }
+			else if (chrCur == '=') { ++m_iChrCur; return m_parsetree.PNodeCreate(NODEK_EQUALS); }
+			else if (chrCur == '{') { ++m_iChrCur; return m_parsetree.PNodeCreate(NODEK_LBRACE); }
+			else if (chrCur == '}') { ++m_iChrCur; return m_parsetree.PNodeCreate(NODEK_RBRACE); }
+			else if (chrCur == ';') { ++m_iChrCur; return m_parsetree.PNodeCreate(NODEK_SEMICOLON); }
 			else
 			{
-				printf("lex error: unexpected character '%c'", chrCur);
-				return  m_parsetree.PNodeCreate(TOKK_ERR);
+				assert(false);
 			}
 		}
-		return  m_parsetree.PNodeCreate(TOKK_EOI);
+		return  m_parsetree.PNodeCreate(NODEK_EOI);
 	}
 
 	void SetInput(string str)
@@ -387,267 +348,38 @@ struct STokenizer // tag = tokenizer
 		m_iChrCur = 0;
 	}
 
-	TOKK TokkKeywordFromString(string str)
+	NODEK NodekTokKeywordFromString(string str)
 	{
 		if(str.compare("do") == 0)
 		{
-			return TOKK_DO;
+			return NODEK_DO;
 		}
 		else if(str.compare("while") == 0)
 		{
-			return TOKK_WHILE;
+			return NODEK_WHILE;
 		}
 		else if(str.compare("if") == 0)
 		{
-			return TOKK_IF;
+			return NODEK_IF;
 		}
 		else if(str.compare("else") == 0)
 		{
-			return TOKK_ELSE;
+			return NODEK_ELSE;
 		}
 		else
 		{
-			return TOKK_NIL;
+			return NODEK_NIL;
 		}
 	}
 
-	string m_strInput;
-	unsigned int m_iChrCur;
+	string			m_strInput;
+	unsigned int	m_iChrCur;
 
-	SParseTree m_parsetree;
+	SParseTree		m_parsetree;
 };
-
-// if we failed to syncronise (we are at the end of input), bail out
-#define CheckPNodeSynced(pNode) if (pNode->m_fHasError && TokkCur() == TOKK_EOI) { return pNode; } else { pNode->m_fHasError = false; }
-
-// if we are not sycronizing this node, and there was an error, turn this node into an error node so the error can be handled up the call stack
-#define CheckPNodeUnsynced(pNode) if (pNode->m_fHasError) { return pNode; }
 
 struct SParser
 {
-	// reresents a given RULEK's first set
-
-	struct SFirstSet // tag = firstset
-	{
-		const TOKK * m_aTokkFirst;
-		const int m_cTokk;
-
-		bool FHasTokk(TOKK tokk) const
-		{
-			for(int iTokkFirst = 0; iTokkFirst < m_cTokk; ++iTokkFirst)
-			{
-				if(m_aTokkFirst[iTokkFirst] == tokk)
-					return true;
-			}
-
-			return false;
-		}
-	};
-
-	// used to syncronise to a given rule after an error
-
-	void SyncTo(RULEK rulek)
-	{
-		// first sets
-
-		static const TOKK s_aTokkFirstAtom[] =
-		{
-			TOKK_ID,
-			TOKK_INT,
-			TOKK_LPAREN
-		};
-
-		static const TOKK s_aTokkFirstSum[] =
-		{
-			TOKK_ID,
-			TOKK_INT,
-			TOKK_LPAREN
-		};
-
-		static const TOKK s_aTokkFirsTestExpr[] =
-		{
-			TOKK_ID,
-			TOKK_INT,
-			TOKK_LPAREN
-		};
-
-		static const TOKK s_aTokkFirstParenExpr[] =
-		{
-			TOKK_LPAREN
-		};
-
-		static const TOKK s_aTokkFirstStatement[] =
-		{
-			TOKK_DO,
-			TOKK_WHILE,
-			TOKK_IF,
-			TOKK_ID,
-			TOKK_LBRACE,
-		};
-
-		static const TOKK s_aTokkFirstProg[] =
-		{
-			TOKK_DO,
-			TOKK_WHILE,
-			TOKK_IF,
-			TOKK_ID,
-			TOKK_LBRACE,
-		};
-		
-		// map from rulek to first set
-
-		static const SFirstSet s_mpRulekFirstSet[] =
-		{
-			// RULEK_NIL
-			{nullptr, 0},
-
-			//RULEK_Atom
-			{s_aTokkFirstAtom, DIM(s_aTokkFirstAtom)},
-
-			//RULEK_Sum
-			{s_aTokkFirstSum, DIM(s_aTokkFirstSum)},
-
-			//RULEK_TestExpr
-			{s_aTokkFirsTestExpr, DIM(s_aTokkFirsTestExpr)},
-
-			//RULEK_ParenExpr
-			{s_aTokkFirstParenExpr, DIM(s_aTokkFirstParenExpr)},
-
-			//RULEK_Statement
-			{s_aTokkFirstStatement, DIM(s_aTokkFirstStatement)},
-
-			//RULEK_Program
-			{s_aTokkFirstProg, DIM(s_aTokkFirstProg)},
-
-		};
-		CASSERT(DIM(s_mpRulekFirstSet) == RULEK_Max);
-		
-		const SFirstSet & firstset = s_mpRulekFirstSet[rulek];
-
-		while(!firstset.FHasTokk(TokkCur()) && TokkCur() != TOKK_EOI)
-		{
-			(void) PNodeTokConsume();
-		}
-	}
-
-	// used to syncronise to a given token after an error
-
-	void SyncTo(TOKK tokk)
-	{
-		while(TokkCur() != tokk && TokkCur() != TOKK_EOI)
-		{
-			(void) PNodeTokConsume();
-		}
-	}
-
-	typedef SParseNode * (SParser::*FuncPNodeNext)();
-
-	SParseNode * PNodeNext(RULEK rulek, RULEK rulekSync = RULEK_NIL)
-	{
-		assert(rulek != RULEK_NIL);
-		
-		const FuncPNodeNext s_mpRulekFuncPNodeNext[] =
-		{
-			//RULEK_NIL,
-			nullptr,
-
-			//RULEK_Atom,
-			&SParser::PNodeAtomNext,
-
-			//RULEK_Sum,
-			&SParser::PNodeSumNext,
-
-			//RULEK_TestExpr,
-			&SParser::PNodeTestExprNext,
-
-			//RULEK_ParenExpr,
-			&SParser::PNodeParenExprNext,
-
-			//RULEK_Statement,
-			&SParser::PNodeStatNext,
-
-			//RULEK_Program,
-			&SParser::PNodeProgNext,
-		};
-		CASSERT(DIM(s_mpRulekFuncPNodeNext) == RULEK_Max);
-
-		FuncPNodeNext funcPnodeNext = s_mpRulekFuncPNodeNext[rulek];
-
-		SParseNode * pNode = (this->*funcPnodeNext)();
-		assert(pNode);
-
-		// if we failed to parse rulek, sync to the sync rule if provided
-		
-		if(pNode->m_fHasError)
-		{
-			if(rulekSync != RULEK_NIL)
-				SyncTo(rulekSync);
-		}
-
-		return pNode;
-	}
-
-	SParseNode * PNodeNext(RULEK rulek, TOKK tokkSync)
-	{
-		assert(rulek != RULEK_NIL);
-		assert(tokkSync != TOKK_ERR);
-
-		SParseNode * pNode = PNodeNext(rulek);
-		assert(pNode);
-
-		// if we failed to parse rulek, sync to the sync token if provided
-
-		if(pNode->m_fHasError)
-		{
-			if(tokkSync != TOKK_NIL)
-				SyncTo(tokkSync);
-		}
-
-		return pNode;
-	}
-
-	SParseNode * PNodeNext(TOKK tokk, RULEK rulekSync = RULEK_NIL)
-	{
-		assert(tokk > TOKK_ERR);
-
-		SParseNode * pNode = PNodeTokConsume();
-		assert(pNode);
-
-		// if got an unexpected token, sync to the sync rule if provided
-
-		if(pNode->m_tokk != tokk)
-		{
-			pNode->m_fHasError = true;
-			printf("parse error : unexpected token\n");
-
-			if(rulekSync != RULEK_NIL)
-				SyncTo(rulekSync);
-		}
-
-		return pNode;
-	}
-
-	SParseNode * PNodeNext(TOKK tokk, TOKK tokkSync)
-	{
-		assert(tokk > TOKK_ERR);
-		assert(tokkSync != TOKK_ERR);
-
-		SParseNode * pNode = PNodeTokConsume();
-		assert(pNode);
-
-		// if got an unexpected token, sync to the sync token if provided
-
-		if(pNode->m_tokk != tokk)
-		{
-			pNode->m_fHasError = true;
-			printf("parse error : unexpected token\n");
-			if(tokkSync != TOKK_NIL)
-				SyncTo(tokkSync);
-		}
-
-		return pNode;
-	}
-	
 	// parse a program
 	
 	SParseNode * PNodeProgNext()
@@ -658,12 +390,11 @@ struct SParser
 				;
 		*/
 		
-		SParseNode * pNode = PParseTree()->PNodeCreate(RULEK_Program);
+		SParseNode * pNode = PParseTree()->PNodeCreate(NODEK_Program);
 
-		while (TokkCur() != TOKK_EOI)
+		while (NodekTokCur() != NODEK_EOI)
 		{
-			pNode->AddChild(PNodeNext(RULEK_Statement, RULEK_Statement)); // statement
-			CheckPNodeSynced(pNode);
+			pNode->AddChild(PNodeStatNext()); // statement
 		}
 
 		return pNode;
@@ -680,102 +411,82 @@ struct SParser
 				| 'while' paren_expr statement
 				| 'do' statement 'while' paren_expr ';'
 				| '{' statement* '}'
-				| ID '=' atom ';'
+				| ID '=' test_expr ';'
 				;
 		*/
 		
-		SParseNode * pNode = PParseTree()->PNodeCreate(RULEK_Statement);
+		SParseNode * pNode = PParseTree()->PNodeCreate(NODEK_Statement);
 
-		if (TokkCur() == TOKK_IF)
+		if (NodekTokCur() == NODEK_IF)
 		{
 			// : 'if' paren_expr statement
 			// | 'if' paren_expr statement 'else' statement
 			
-			pNode->AddChild(PNodeNext(TOKK_IF)); // 'if'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_IF)); // 'if'
 
-			pNode->AddChild(PNodeNext(RULEK_ParenExpr, RULEK_Statement)); // paren_expr 
-			CheckPNodeSynced(pNode);
+			pNode->AddChild(PNodeParenExprNext()); // paren_expr 
 
-			pNode->AddChild(PNodeNext(RULEK_Statement)); // statement
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeStatNext()); // statement
 
-			if (TokkCur() == TOKK_ELSE)
+			if (NodekTokCur() == NODEK_ELSE)
 			{
-				pNode->AddChild(PNodeNext(TOKK_ELSE, RULEK_Statement)); // 'else'
-				CheckPNodeSynced(pNode);
+				pNode->AddChild(PNodeTokConsume(NODEK_ELSE)); // 'else'
 
-				pNode->AddChild(PNodeNext(RULEK_Statement)); // statement
-				CheckPNodeUnsynced(pNode);
+				pNode->AddChild(PNodeStatNext()); // statement
 			}
 		}
-		else if (TokkCur() == TOKK_WHILE)
+		else if (NodekTokCur() == NODEK_WHILE)
 		{
 			// 'while' paren_expr statement
 			
-			pNode->AddChild(PNodeNext(TOKK_WHILE)); // 'while'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_WHILE)); // 'while'
 
-			pNode->AddChild(PNodeNext(RULEK_ParenExpr, RULEK_Statement)); // paren_expr
-			CheckPNodeSynced(pNode);
+			pNode->AddChild(PNodeParenExprNext()); // paren_expr
 
-			pNode->AddChild(PNodeNext(RULEK_Statement)); // statement
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeStatNext()); // statement
 		}
-		else if (TokkCur() == TOKK_DO)
+		else if (NodekTokCur() == NODEK_DO)
 		{
 			// 'do' statement 'while' paren_expr ';'
 			
-			pNode->AddChild(PNodeNext(TOKK_DO)); // 'do'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_DO)); // 'do'
 
-			pNode->AddChild(PNodeNext(RULEK_Statement, TOKK_WHILE)); // statement BB (matthewd) hmmm... syncing on TOKK_WHILE seems dangorous
-			CheckPNodeSynced(pNode);
+			pNode->AddChild(PNodeStatNext()); // statement
 
-			pNode->AddChild(PNodeNext(TOKK_WHILE, RULEK_ParenExpr)); // 'while'
-			CheckPNodeSynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_WHILE)); // 'while'
 
-			pNode->AddChild(PNodeNext(RULEK_ParenExpr, TOKK_SEMICOLON)); // paren_expr
-			CheckPNodeSynced(pNode);
+			pNode->AddChild(PNodeParenExprNext()); // paren_expr
 
-			pNode->AddChild(PNodeNext(TOKK_SEMICOLON)); // ';'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_SEMICOLON)); // ';'
 		}
-		else if (TokkCur() == TOKK_LBRACE)
+		else if (NodekTokCur() == NODEK_LBRACE)
 		{
 			// '{' statement* '}'
 			
-			pNode->AddChild(PNodeNext(TOKK_LBRACE)); // '{'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_LBRACE)); // '{'
 
-			while (TokkCur() != TOKK_RBRACE)
+			while (NodekTokCur() != NODEK_RBRACE)
 			{
-				pNode->AddChild(PNodeNext(RULEK_Statement, RULEK_Statement)); // statement bb hmm...should also probably sync on TOKK_RBRACE
-				CheckPNodeSynced(pNode);
+				pNode->AddChild(PNodeStatNext()); // statement
 			}
 
-			pNode->AddChild(PNodeNext(TOKK_RBRACE)); // '}'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_RBRACE)); // '}'
 		}
-		else if (TokkCur() == TOKK_ID)
+		else if (NodekTokCur() == NODEK_ID)
 		{
-			// ID '=' atom ';'
+			// ID '=' test_expr ';'
 			
-			pNode->AddChild(PNodeNext(TOKK_ID)); // ID
+			pNode->AddChild(PNodeTokConsume(NODEK_ID)); // ID
 
-			pNode->AddChild(PNodeNext(TOKK_EQUALS, RULEK_Atom)); // '='
-			CheckPNodeSynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_EQUALS)); // '='
 
-			pNode->AddChild(PNodeNext(RULEK_Atom, TOKK_SEMICOLON)); // atom
-			CheckPNodeSynced(pNode);
+			pNode->AddChild(PNodeTestExprNext()); // test_expr
 
-			pNode->AddChild(PNodeNext(TOKK_SEMICOLON)); // ';'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_SEMICOLON)); // ';'
 		}
 		else
 		{
-			pNode->m_fHasError = true;
-			printf("parse error : no viable alt");
+			assert(false);
 		}
 
 		return pNode;
@@ -791,16 +502,13 @@ struct SParser
 				;
 		*/
 		
-		SParseNode * pNode = PParseTree()->PNodeCreate(RULEK_ParenExpr);
+		SParseNode * pNode = PParseTree()->PNodeCreate(NODEK_ParenExpr);
 
-		pNode->AddChild(PNodeNext(TOKK_LPAREN, RULEK_TestExpr)); // '('
-		CheckPNodeSynced(pNode);
+		pNode->AddChild(PNodeTokConsume(NODEK_LPAREN)); // '('
 
-		pNode->AddChild(PNodeNext(RULEK_TestExpr, TOKK_RPAREN)); // test_expr
-		CheckPNodeSynced(pNode);
+		pNode->AddChild(PNodeTestExprNext()); // test_expr
 
-		pNode->AddChild(PNodeNext(TOKK_RPAREN)); // ')'
-		CheckPNodeUnsynced(pNode);
+		pNode->AddChild(PNodeTokConsume(NODEK_RPAREN)); // ')'
 
 		return pNode;
 	}
@@ -816,18 +524,15 @@ struct SParser
 				;
 		*/
 		
-		SParseNode * pNode = PParseTree()->PNodeCreate(RULEK_TestExpr);
+		SParseNode * pNode = PParseTree()->PNodeCreate(NODEK_TestExpr);
 
-		pNode->AddChild(PNodeNext(RULEK_Sum)); // sum
-		CheckPNodeUnsynced(pNode);
+		pNode->AddChild(PNodeSumNext()); // sum
 
-		if (TokkCur() == TOKK_LT)
+		if (NodekTokCur() == NODEK_LT)
 		{
-			pNode->AddChild(PNodeNext(TOKK_LT)); // '<'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_LT)); // '<'
 
-			pNode->AddChild(PNodeNext(RULEK_Sum)); // sum
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeSumNext()); // sum
 		}
 		return pNode;
 	}
@@ -844,26 +549,21 @@ struct SParser
 				;
 		*/
 		
-		SParseNode * pNode = PParseTree()->PNodeCreate(RULEK_Sum);
+		SParseNode * pNode = PParseTree()->PNodeCreate(NODEK_Sum);
 
-		pNode->AddChild(PNodeNext(RULEK_Atom)); // atom
-		CheckPNodeUnsynced(pNode);
+		pNode->AddChild(PNodeAtomNext()); // atom
 
-		if (TokkCur() == TOKK_PLUS)
+		if (NodekTokCur() == NODEK_PLUS)
 		{
-			pNode->AddChild(PNodeNext(TOKK_PLUS)); // '+'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_PLUS)); // '+'
 
-			pNode->AddChild(PNodeNext(RULEK_Sum)); //  sum
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeSumNext()); //  sum
 		}
-		else if (TokkCur() == TOKK_SUB)
+		else if (NodekTokCur() == NODEK_SUB)
 		{
-			pNode->AddChild(PNodeNext(TOKK_SUB)); // '-'
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeTokConsume(NODEK_SUB)); // '-'
 
-			pNode->AddChild(PNodeNext(RULEK_Sum)); // sum
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeSumNext()); // sum
 		}
 
 		return pNode;
@@ -881,19 +581,17 @@ struct SParser
 				;
 		*/
 		
-		SParseNode * pNode = PParseTree()->PNodeCreate(RULEK_Atom);
+		SParseNode * pNode = PParseTree()->PNodeCreate(NODEK_Atom);
 
-		if (TokkCur() == TOKK_INT) { pNode->AddChild(PNodeNext(TOKK_INT)); }  // ID
-		else if (TokkCur() == TOKK_ID) { pNode->AddChild(PNodeNext(TOKK_ID)); } // INT
-		else if (TokkCur() == TOKK_LPAREN) 
+		if (NodekTokCur() == NODEK_INT) { pNode->AddChild(PNodeTokConsume(NODEK_INT)); }  // ID
+		else if (NodekTokCur() == NODEK_ID) { pNode->AddChild(PNodeTokConsume(NODEK_ID)); } // INT
+		else if (NodekTokCur() == NODEK_LPAREN) 
 		{ 
-			pNode->AddChild(PNodeNext(RULEK_ParenExpr)); // parenExpr
-			CheckPNodeUnsynced(pNode);
+			pNode->AddChild(PNodeParenExprNext()); // parenExpr
 		} 
 		else
 		{
-			pNode->m_fHasError = true;
-			printf("parse error : no viable alt");
+			assert(false);
 		}
 
 		return pNode;
@@ -905,13 +603,16 @@ struct SParser
 		m_pNodeTokCur = m_tokenizer.PNodeTokNext();
 	}
 
-	TOKK TokkCur()
+	NODEK NodekTokCur()
 	{
-		return m_pNodeTokCur->m_tokk;
+		return m_pNodeTokCur->m_nodek;
 	}
 
-	SParseNode * PNodeTokConsume()
+	SParseNode * PNodeTokConsume(NODEK nodek)
 	{
+		assert(nodek < NODEK_TOKMAX);
+		assert(m_pNodeTokCur->m_nodek == nodek);
+		
 		// return current token and get next token
 
 		SParseNode * pNodeTokMatch = m_pNodeTokCur;
@@ -1122,7 +823,7 @@ struct SAst
 	{
 		SExpression * pExpr = nullptr;
 		
-		if (pNode->m_tokk == TOKK_INT)
+		if (pNode->m_nodek == NODEK_INT)
 		{
 			// INT
 			
@@ -1131,7 +832,7 @@ struct SAst
 			assert(pNode->m_str.size() > 0);
 			pExpr->m_n = atoi(&pNode->m_str[0]);
 		}
-		else if (pNode->m_tokk == TOKK_ID)
+		else if (pNode->m_nodek == NODEK_ID)
 		{
 			// ID
 			
@@ -1140,7 +841,7 @@ struct SAst
 			assert(pNode->m_str.size() == 1);
 			pExpr->m_iGlobal = pNode->m_str[0] - 'a';
 		}
-		else if (pNode->m_rulek == RULEK_Atom)
+		else if (pNode->m_nodek == NODEK_Atom)
 		{
 			/*
 				atom
@@ -1153,7 +854,7 @@ struct SAst
 			assert(pNode->CChild() == 1);
 			pExpr = PExprFromPNode(pNode->PNodeChild(0)); // ID | INT | parenExpr
 		}
-		else if (pNode->m_rulek == RULEK_ParenExpr)
+		else if (pNode->m_nodek == NODEK_ParenExpr)
 		{
 			/*
 				parenExpr
@@ -1164,7 +865,7 @@ struct SAst
 			assert(pNode->CChild() == 3);
 			pExpr = PExprFromPNode(pNode->PNodeChild(1)); // test_expr
 		}
-		else if (pNode->m_rulek == RULEK_Sum || pNode->m_rulek == RULEK_TestExpr)
+		else if (pNode->m_nodek == NODEK_Sum || pNode->m_nodek == NODEK_TestExpr)
 		{
 			/*
 				testExpr
@@ -1185,7 +886,7 @@ struct SAst
 
 				pExpr->m_pExprLeft = PExprFromPNode(pNode->PNodeChild(0)); // sum | atom
 
-				pExpr->m_binopk = BinopkFromTokk(pNode->PNodeChild(1)->m_tokk); // '<' | '+' | '-'
+				pExpr->m_binopk = BinopkFromNodekTok(pNode->PNodeChild(1)->m_nodek); // '<' | '+' | '-'
 				assert(pExpr->m_binopk != BINOPK_Nil);
 
 				pExpr->m_pExprRight = PExprFromPNode(pNode->PNodeChild(2)); // sum
@@ -1218,7 +919,7 @@ struct SAst
 
 		// a program or statement
 
-		if (pNode->m_rulek == RULEK_Program)
+		if (pNode->m_nodek == NODEK_Program)
 		{
 			/*
 				program
@@ -1233,7 +934,7 @@ struct SAst
 				pStat->m_aryPStat.push_back(PStatFromPNode(pNode->PNodeChild(iChild))); // statement
 			}
 		}
-		else if (pNode->m_rulek == RULEK_Statement)
+		else if (pNode->m_nodek == NODEK_Statement)
 		{
 			/*
 				statement
@@ -1248,9 +949,9 @@ struct SAst
 
 			assert(pNode->CChild() != 0);
 
-			TOKK tokkChildFirst = pNode->PNodeChild(0)->m_tokk;
+			NODEK nodekChildFirst = pNode->PNodeChild(0)->m_nodek;
 
-			if (tokkChildFirst == TOKK_IF)
+			if (nodekChildFirst == NODEK_IF)
 			{
 				// : 'if' paren_expr statement
 				// | 'if' paren_expr statement 'else' statement
@@ -1267,7 +968,7 @@ struct SAst
 					pStat->m_pStatBody = PStatFromPNode(pNode->PNodeChild(4)); // statement
 				}
 			}
-			else if (tokkChildFirst == TOKK_WHILE)
+			else if (nodekChildFirst == NODEK_WHILE)
 			{
 				// | 'while' paren_expr statement
 				
@@ -1277,7 +978,7 @@ struct SAst
 				pStat->m_pExprCondition = PExprFromPNode(pNode->PNodeChild(1)); // paren_expr
 				pStat->m_pStatBody = PStatFromPNode(pNode->PNodeChild(2)); // statement
 			}
-			else if (tokkChildFirst == TOKK_DO)
+			else if (nodekChildFirst == NODEK_DO)
 			{
 				// | 'do' statement 'while' paren_expr ';'
 				
@@ -1287,21 +988,21 @@ struct SAst
 				pStat->m_pStatBody = PStatFromPNode(pNode->PNodeChild(1)); // statement
 				pStat->m_pExprCondition = PExprFromPNode(pNode->PNodeChild(3)); // paren_expr
 			}
-			else if (tokkChildFirst == TOKK_LBRACE)
+			else if (nodekChildFirst == NODEK_LBRACE)
 			{
 				// | '{' statement* '}'
 
 				pStat = PStatCreate(STATK_Statements);
 				
 				assert(pNode->CChild() >= 2);
-				assert(pNode->PNodeChild(pNode->CChild() - 1)->m_tokk == TOKK_RBRACE);
+				assert(pNode->PNodeChild(pNode->CChild() - 1)->m_nodek == NODEK_RBRACE);
 
 				for(int iChild = 1; iChild < pNode->CChild() - 1; ++iChild)
 				{
 					pStat->m_aryPStat.push_back(PStatFromPNode(pNode->PNodeChild(iChild))); // statement
 				}
 			}
-			else if (tokkChildFirst == TOKK_ID)
+			else if (nodekChildFirst == NODEK_ID)
 			{
 				// | ID '=' atom ';'
 				
@@ -1324,14 +1025,14 @@ struct SAst
 		return pStat;
 	}
 
-	BINOPK BinopkFromTokk(TOKK tokk)
+	BINOPK BinopkFromNodekTok(NODEK nodek)
 	{
-		switch (tokk)
+		switch (nodek)
 		{
-			case TOKK_PLUS: return BINOPK_PLUS;
-			case TOKK_SUB:	return BINOPK_SUB;
-			case TOKK_LT:	return BINOPK_LT;
-			default:		return BINOPK_Nil;
+			case NODEK_PLUS:	return BINOPK_PLUS;
+			case NODEK_SUB:		return BINOPK_SUB;
+			case NODEK_LT:		return BINOPK_LT;
+			default:			return BINOPK_Nil;
 		}
 	}
 
@@ -1350,8 +1051,6 @@ int main()
 	SParseNode * pNode = parser.PNodeProgNext();
 
 	pNode->PrintDebug();
-
-	if(pNode->m_fHasError) return 0;
 
 	SAst ast;
 
