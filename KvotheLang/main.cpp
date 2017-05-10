@@ -18,9 +18,21 @@ using std::function;
 // http://www.iro.umontreal.ca/~felipe/IFT2030-Automne2002/Complements/tinyc.c
 
 // grammar
+// factored to remove left recursion (because we are an LL parser)
+// factored so that all alts of a rule have a unique starting token (because we are an LL(1) parser) BB what if the first part of the alt is OPTIONAL
+// factored to not use ? + or * (use OPTIONAL instead). this makes the table driven code simpler
+// OPTIONAL means the rule can go the the empty string (i.e. if we cant go into one of the other alts, just skip this rule)
+// cammelCase is a rule, UPPERCASE is a token
+// text in '' means an implicet token (i.e. 'while' implies a token WHILE : 'while')
+// tokens can be specified as a simple regex (it has to be implimented by hand)
 /*
 	program
-		: statement +
+		: statement statement_list EOI
+		;
+		
+	statement_list
+		: OPTIONAL
+		| statement statement_list
 		;
 
 	statement
@@ -28,7 +40,7 @@ using std::function;
 		| 'if' paren_expr statement 'else' statement
 		| 'while' paren_expr statement
 		| 'do' statement 'while' paren_expr ';'
-		| '{' statement* '}'
+		| '{' statement_list '}'
 		| ID '=' testExpr ';'
 		;
 
@@ -37,14 +49,22 @@ using std::function;
 		;
 
 	testExpr
-		: sum
-		| sum '<' sum
+		: sum testExpr_rhs
 		;
+		
+	testExpr_rhs
+		: OPTIONAL
+		| '<' sum
+		; 
 
 	sum
-		: atom
-		| atom '+' sum
-		| atom '-' sum
+		: atom sum_rhs
+		;
+		
+	sum_rhs
+		: OPTIONAL
+		| '+' sum
+		| '-' sum
 		;
 
 	atom
@@ -53,7 +73,7 @@ using std::function;
 		| parenExpr
 		;
 
-	ID : [a-z]
+	ID	: [a-z]
 	INT : [0-9]+
 */
 
