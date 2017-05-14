@@ -397,7 +397,13 @@ struct STokenizer // tag = tokenizer
 		};
 		CASSERT(DIM(s_mpTokkChr) == TOKK_Max);
 
-		// BB handle character literals and escape characters
+		// BB handle literals generally
+		// int literals https://msdn.microsoft.com/en-us/library/aa664674(v=vs.71).aspx
+		// float literals https://msdn.microsoft.com/en-us/library/aa691085(v=vs.71).aspx
+		// char literals https://msdn.microsoft.com/en-us/library/aa691087(v=vs.71).aspx
+		// string literals https://msdn.microsoft.com/en-us/library/aa691090(v=vs.71).aspx
+
+		// BB handle comments
 		
 		while (ChrCur() != EOF)
 		{
