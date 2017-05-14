@@ -142,7 +142,7 @@ struct SParseTree // tag = parsetree
 
 		void PrintDebug() override
 		{
-			printf("(rule");
+			printf("(");
 
 			for(SParseNode * pNodeChild : m_aryPNodeChild)
 			{
@@ -150,7 +150,7 @@ struct SParseTree // tag = parsetree
 				pNodeChild->PrintDebug();
 			}
 
-			printf(")");
+			printf(" )");
 		}
 
 		RULEK Rulek() override { return m_rulek; }
@@ -172,11 +172,9 @@ struct SParseTree // tag = parsetree
 		
 		void PrintDebug() override
 		{
-			printf("token");
-
 			if(m_str.size() > 0)
 			{
-				printf(" '%s'", m_str.c_str());
+				printf("'%s'", m_str.c_str());
 			}
 		}
 
