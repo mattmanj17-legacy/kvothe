@@ -14,20 +14,45 @@ using std::vector;
 using std::shared_ptr;
 using std::function;
 
+// http://stackoverflow.com/a/6256085
+
+#define DIM(arr) ( \
+   0 * sizeof(reinterpret_cast<const ::Bad_arg_to_DIM*>(arr)) + \
+   0 * sizeof(::Bad_arg_to_DIM::check_type((arr), &(arr))) + \
+   sizeof(arr) / sizeof((arr)[0]) )
+
+struct Bad_arg_to_DIM {
+   class Is_pointer; // incomplete
+   class Is_array {};
+   template <typename T>
+   static Is_pointer check_type(const T*, const T* const*);
+   static Is_array check_type(const void*, const void*);
+};
+
+#define ARY(NAME, TYPE, ...) TYPE NAME ## _underlying_array [] = {__VA_ARGS__}; const SAry<TYPE> NAME = {NAME ## _underlying_array, DIM(NAME ## _underlying_array)}
+#define CASSERT(predicate) static_assert(predicate, #predicate)
+
+template <typename T>
+struct SAry
+{
+	const T*	m_a;
+	const int	m_c;
+};
+
 // Tiny C
 // http://www.iro.umontreal.ca/~felipe/IFT2030-Automne2002/Complements/tinyc.c
 
 // grammar
 // factored to remove left recursion (because we are an LL parser)
-// factored so that all alts of a rule have a unique starting token (because we are an LL(1) parser) BB what if the first part of the alt is OPTIONAL
-// factored to not use ? + or * (use OPTIONAL instead). this makes the table driven code simpler
+// factored so that the sets of starting tokens of all alts of a rule are disjoint (because we are an LL(1) parser)
+// in the case where an alt begins with an optional rule, the set of starting tokens includes the starting tokens of the next rule in the alt if there is one (which could also be an optional, etc)
+// factored to not use +, * or | within an alt. ? is supported with OPTIONAL.
 // OPTIONAL means the rule can go the the empty string (i.e. if we cant go into one of the other alts, just skip this rule)
-// cammelCase is a rule, UPPERCASE is a token
+// CammelCase is a rule, UPPERCASE is a token
 // text in '' means an implicet token (i.e. 'while' implies a token WHILE : 'while')
-// tokens can be specified as a simple regex (it has to be implimented by hand)
 /*
 	program
-		: statement statement_list EOI
+		: statement statement_list
 		;
 		
 	statement_list
@@ -36,12 +61,16 @@ using std::function;
 		;
 
 	statement
-		: 'if' paren_expr statement
-		| 'if' paren_expr statement 'else' statement
+		: 'if' paren_expr statement if_rhs
 		| 'while' paren_expr statement
 		| 'do' statement 'while' paren_expr ';'
 		| '{' statement_list '}'
 		| ID '=' testExpr ';'
+		;
+
+	if_rhs
+		: OPTIONAL
+		| 'else' statement
 		;
 
 	parenExpr
@@ -103,30 +132,127 @@ enum NODEK
 
 	NODEK_Atom = NODEK_TOKMAX,
 	NODEK_Sum,
+	NODEK_SumRHS,
 	NODEK_TestExpr,
+	NODEK_TestExprRHS,
 	NODEK_ParenExpr,
 	NODEK_Statement,
+	NODEK_IfRHS,
+	NODEK_StatementList,
 	NODEK_Program,
 
 	NODEK_Max,
 };
 
-// http://stackoverflow.com/a/6256085
+typedef SAry<const NODEK> Alt;
+typedef SAry<const Alt*> Rule;
 
-#define DIM(arr) ( \
-   0 * sizeof(reinterpret_cast<const ::Bad_arg_to_DIM*>(arr)) + \
-   0 * sizeof(::Bad_arg_to_DIM::check_type((arr), &(arr))) + \
-   sizeof(arr) / sizeof((arr)[0]) )
+ARY(g_altOptional, const NODEK, 
+	NODEK_NIL);
 
-struct Bad_arg_to_DIM {
-   class Is_pointer; // incomplete
-   class Is_array {};
-   template <typename T>
-   static Is_pointer check_type(const T*, const T* const*);
-   static Is_array check_type(const void*, const void*);
-};
+ARY(g_altAtom1, const NODEK, 
+	NODEK_ID);
 
-#define CASSERT(predicate) static_assert(predicate, #predicate)
+ARY(g_altAtom2, const NODEK, 
+	NODEK_INT);
+
+ARY(g_altAtom3, const NODEK, 
+	NODEK_ParenExpr);
+
+ARY(g_ruleAtom, const Alt*, 
+	&g_altAtom1, 
+	&g_altAtom2, 
+	&g_altAtom3);
+
+ARY(g_altSum1, const NODEK, 
+	NODEK_Atom, NODEK_SumRHS);
+
+ARY(g_ruleSum, const Alt*, 
+	&g_altSum1);
+
+ARY(g_altSumRHS1, const NODEK, 
+	NODEK_PLUS, NODEK_Sum);
+
+ARY(g_altSumRHS2, const NODEK, 
+	NODEK_SUB, NODEK_Sum);
+
+ARY(g_ruleSumRHS, const Alt*, 
+	&g_altOptional, 
+	&g_altSumRHS1, 
+	&g_altSumRHS2);
+
+ARY(g_altTestExpr1, const NODEK, 
+	NODEK_Sum, NODEK_TestExprRHS);
+
+ARY(g_ruleTestExpr, const Alt*, 
+	&g_altTestExpr1);
+
+ARY(g_altTestExprRHS1, const NODEK, 
+	NODEK_LT, NODEK_Sum);
+
+ARY(g_ruleTestExprRHS, const Alt*, 
+	&g_altOptional,
+	&g_altTestExprRHS1);
+
+ARY(g_altParenExpr1, const NODEK, 
+	NODEK_LPAREN, NODEK_TestExpr, NODEK_RPAREN);
+
+ARY(g_ruleParenExpr, const Alt*, 
+	&g_altParenExpr1);
+
+ARY(g_altStatement1, const NODEK, 
+	NODEK_IF, NODEK_ParenExpr, NODEK_Statement, NODEK_IfRHS);
+
+ARY(g_altStatement2, const NODEK, 
+	NODEK_WHILE, NODEK_ParenExpr, NODEK_Statement);
+
+ARY(g_altStatement3, const NODEK, 
+	NODEK_DO, NODEK_Statement, NODEK_WHILE, NODEK_ParenExpr, NODEK_SEMICOLON);
+
+ARY(g_altStatement4, const NODEK, 
+	NODEK_LBRACE, NODEK_StatementList, NODEK_RBRACE);
+
+ARY(g_altStatement5, const NODEK, 
+	NODEK_ID, NODEK_EQUALS, NODEK_TestExpr, NODEK_SEMICOLON);
+
+ARY(g_ruleStatement, const Alt*, 
+	&g_altStatement1,
+	&g_altStatement2,
+	&g_altStatement3,
+	&g_altStatement4,
+	&g_altStatement5);
+
+ARY(g_altIfRHS1, const NODEK, 
+	NODEK_ELSE, NODEK_Statement);
+
+ARY(g_ruleIfRHS, const Alt*, 
+	&g_altOptional,
+	&g_altIfRHS1);
+
+ARY(g_altStatementList1, const NODEK, 
+	NODEK_Statement, NODEK_StatementList);
+
+ARY(g_ruleStatementList, const Alt*, 
+	&g_altOptional,
+	&g_altStatementList1);
+
+ARY(g_altProgram1, const NODEK, 
+	NODEK_Statement, NODEK_StatementList);
+
+ARY(g_ruleProgram, const Alt*, 
+	&g_altProgram1);
+
+ARY(g_mpRulekRule, const Rule*, 
+	&g_ruleAtom, 
+	&g_ruleSum, 
+	&g_ruleSumRHS, 
+	&g_ruleTestExpr, 
+	&g_ruleTestExprRHS, 
+	&g_ruleParenExpr, 
+	&g_ruleStatement, 
+	&g_ruleIfRHS, 
+	&g_ruleStatementList, 
+	&g_ruleProgram);
 
 // node in the parse tree
 
@@ -146,7 +272,7 @@ struct SParseNode // tag = node
 		m_aryPNodeChild.push_back(pNodeChild);
 	}
 
-	SParseNode * PNodeChild(int nChild)
+	SParseNode * PNodeChild(unsigned int nChild)
 	{
 		assert(nChild < m_aryPNodeChild.size() && nChild >= 0);
 		return m_aryPNodeChild[nChild];
@@ -400,6 +526,9 @@ struct STokenizer // tag = tokenizer
 
 struct SParser
 {
+	typedef vector<NODEK> alt;
+	typedef vector<alt> rule;
+	
 	// parse a program
 	
 	SParseNode * PNodeProgNext()
