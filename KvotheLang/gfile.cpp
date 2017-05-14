@@ -12,131 +12,18 @@ using std::shared_ptr;
 #include "macros.h"
 
 // parser for gfiles grammar, files that specify a grammar
+// for grammar of gfiles (written as a gfile), see gfile.gfile
 
-/* grammar for gfile (written as a gfile)
-Rule grammar
-	: (rule | token) +
-	;
+// token kind
 
-Rule rule
-	: RULE _ID COLON ruleBody SEMICOLON
-	;
-	
-Rule ruleBody
-	: atom postfixOperator? (VBAR? atom postfixOperator?)* 
-	;
-
-Rule postfixOperator
-	: QMARK
-	| PLUS
-	| STAR
-	;
-	
-Rule atom 
-	: builtinToken
-	| _ID
-	| LPAREN ruleBody RPAREN
-	;
-	
-Rule builtinToken 
-	: ID
-	| NUM
-	;
-	
-Rule token
-	: TOKEN _ID COLON tokenLiteral SEMICOLON
-	;
-	
-Rule tokenLiteral
-	: TICK (_ID | symbol) TICK 
-	;
-	
-Rule symbol
-	: (escapedSymbolChar | unescapedSymbolChar) +
-	;
-	
-Rule escapedSymbolChar
-	: ESC_BSLASH | ESC_TICK
-	;
-	
-Rule unescapedSymbolChar
-	: BTICK		
-	| TILDE		
-	| BANG		
-	| AT		
-	| HASH		
-	| DOLLAR	
-	| PERCENT	
-	| CARROT	
-	| AMP		
-	| STAR		
-	| LPAREN	
-	| RPAREN	
-	| UBAR		
-	| PLUS		
-	| HBAR		
-	| EQUAL		
-	| VBAR		
-	| LBRACK	
-	| RBRACK	
-	| LBRACE	
-	| RBRACE	
-	| SEMICOLON	
-	| COLON		
-	| COMMA		
-	| LT		
-	| GT		
-	| DOT		
-	| FSLASH	
-	| QMARK		
-	;
-	
-Token RULE 		: 'Rule';
-Token TOKEN 	: 'Token';
-Token ID 		: '_ID';
-Token NUM 		: '_NUM';
-
-Token ESC_BSLASH: '\\\\';
-Token ESC_TICK	: '\\\'';
-Token TICK 		: '\'';
-Token BTICK		: '`' ;
-Token TILDE		: '~' ;
-Token BANG		: '!' ;
-Token AT		: '@' ;
-Token HASH		: '#' ;
-Token DOLLAR	: '$' ;
-Token PERCENT	: '%' ;
-Token CARROT	: '^' ;
-Token AMP		: '&' ;
-Token STAR		: '*' ;
-Token LPAREN	: '(' ;
-Token RPAREN	: ')' ;
-Token UBAR		: '_' ;
-Token PLUS		: '+' ;
-Token HBAR		: '-' ;
-Token EQUAL		: '=' ;
-Token VBAR		: '|' ;
-Token LBRACK	: '[' ;
-Token RBRACK	: ']' ;
-Token LBRACE	: '{' ;
-Token RBRACE	: '}' ;
-Token SEMICOLON	: ';' ;
-Token COLON		: ':' ;
-Token COMMA		: ',' ;
-Token LT		: '<' ;
-Token GT		: '>' ;
-Token DOT		: '.' ;
-Token FSLASH	: '/' ;
-Token QMARK		: '?' ;
-*/
-
-ENUM(TOKK, 
+enum TOKK
+{
 	TOKK_ID,	
-	TOKK_NUM,
+	TOKK_STRING,
 	TOKK_KW_RULE, 	
 	TOKK_KW_TOKEN,
 	TOKK_KW_ID,	
-	TOKK_KW_NUM, 	
+	TOKK_KW_STRING, 	
 	TOKK_ESC_BSLASH,
 	TOKK_ESC_TICK,
 	TOKK_TICK,
@@ -152,7 +39,6 @@ ENUM(TOKK,
 	TOKK_STAR,
 	TOKK_LPAREN,
 	TOKK_RPAREN,
-	TOKK_UBAR,
 	TOKK_PLUS,
 	TOKK_HBAR,
 	TOKK_EQUAL,
@@ -168,10 +54,17 @@ ENUM(TOKK,
 	TOKK_GT,
 	TOKK_DOT,
 	TOKK_FSLASH,
-	TOKK_QMARK
-);
+	TOKK_QMARK,
 
-ENUM(RULEK, 
+	TOKK_Max,
+	TOKK_Nil = -1,
+	TOKK_Min = 0
+};
+
+// rule kind
+
+enum RULEK
+{
 	RULEK_grammar,
 	RULEK_rule,
 	RULEK_ruleBody,
@@ -182,15 +75,24 @@ ENUM(RULEK,
 	RULEK_tokenLiteral,
 	RULEK_symbol,
 	RULEK_escapedSymbolChar,
-	RULEK_unescapedSymbolChar
-);
+	RULEK_unescapedSymbolChar,
 
-ENUM(NODEK,
+	RULEK_Max,
+	RULEK_Nil = -1,
+	RULEK_Min = 0
+};
+
+// parse node kind
+
+enum NODEK
+{
 	NODEK_Rule,
-	NODEK_Token
-);
+	NODEK_Token,
 
-// node in the parse tree
+	NODEK_Max,
+	NODEK_Nil = -1,
+	NODEK_Min = 0
+};
 
 // parse tree
 
@@ -240,7 +142,7 @@ struct SParseTree // tag = parsetree
 
 		void PrintDebug() override
 		{
-			printf("(%s", PChzFromRULEK(m_rulek));
+			printf("(rule");
 
 			for(SParseNode * pNodeChild : m_aryPNodeChild)
 			{
@@ -270,7 +172,7 @@ struct SParseTree // tag = parsetree
 		
 		void PrintDebug() override
 		{
-			printf("%s", PChzFromTOKK(m_tokk));
+			printf("token");
 
 			if(m_str.size() > 0)
 			{
@@ -305,8 +207,7 @@ struct STokenizer // tag = tokenizer
 {
 	STokenizer()
 	: m_parsetree()
-	, m_iChrCur(0)
-	, m_strInput("")
+	, m_pFile(nullptr)
 	{
 	}
 
@@ -314,145 +215,153 @@ struct STokenizer // tag = tokenizer
 	{
 		static char s_mpTokkChr [] =
 		{
-			0,
-			0,
-			0,
-			0,
-			0,
-			0,
-			0,
-			0,
-			'\'',
-			'`',
-			'~',
-			'!',
-			'@',
-			'#',
-			'$',
-			'%',
-			'^',
-			'&',
-			'*',
-			'(',
-			')',
-			'_',
-			'+',
-			'-',
-			'=',
-			'|',
-			'[',
-			']',
-			'{',
-			'}',
-			';',
-			':',
-			',',
-			'<',
-			'>',
-			'.',
-			'/',
-			'?',
+			0,		// TOKK_ID,	
+			0,		// TOKK_STRING,
+			0,		// TOKK_KW_RULE, 	
+			0,		// TOKK_KW_TOKEN,
+			0,		// TOKK_KW_ID,	
+			0,		// TOKK_KW_STRING, 	
+			0,		// TOKK_ESC_BSLASH,
+			0,		// TOKK_ESC_TICK,
+			'\'',	// TOKK_TICK,
+			'`',	// TOKK_BTICK,
+			'~',	// TOKK_TILDE,
+			'!',	// TOKK_BANG,
+			'@',	// TOKK_AT,
+			'#',	// TOKK_HASH,
+			'$',	// TOKK_DOLLAR,
+			'%',	// TOKK_PERCENT,
+			'^',	// TOKK_CARROT,
+			'&',	// TOKK_AMP,
+			'*',	// TOKK_STAR,
+			'(',	// TOKK_LPAREN,
+			')',	// TOKK_RPAREN,
+			'+',	// TOKK_PLUS,
+			'-',	// TOKK_HBAR,
+			'=',	// TOKK_EQUAL,
+			'|',	// TOKK_VBAR,
+			'[',	// TOKK_LBRACK,
+			']',	// TOKK_RBRACK,
+			'{',	// TOKK_LBRACE,
+			'}',	// TOKK_RBRACE,
+			';',	// TOKK_SEMICOLON,
+			':',	// TOKK_COLON,
+			',',	// TOKK_COMMA,
+			'<',	// TOKK_LT,
+			'>',	// TOKK_GT,
+			'.',	// TOKK_DOT,
+			'/',	// TOKK_FSLASH,
+			'?',	// TOKK_QMARK
 		};
 		CASSERT(DIM(s_mpTokkChr) == TOKK_Max);
 
 		static const char * s_mpTokkPChz [] =
 		{
-			nullptr,
-			nullptr,
-			"Rule",
-			"Token",
-			"__ID",
-			"__NUM",
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
-			nullptr,
+			nullptr,	// TOKK_ID,	
+			nullptr,	// TOKK_STRING,
+			"Rule",		// TOKK_KW_RULE, 	
+			"Token",	// TOKK_KW_TOKEN,
+			"ID",		// TOKK_KW_ID,	
+			"STRING",	// TOKK_KW_STRING, 	
+			nullptr,	// TOKK_ESC_BSLASH,
+			nullptr,	// TOKK_ESC_TICK,
+			nullptr,	// TOKK_TICK,
+			nullptr,	// TOKK_BTICK,
+			nullptr,	// TOKK_TILDE,
+			nullptr,	// TOKK_BANG,
+			nullptr,	// TOKK_AT,
+			nullptr,	// TOKK_HASH,
+			nullptr,	// TOKK_DOLLAR,
+			nullptr,	// TOKK_PERCENT,
+			nullptr,	// TOKK_CARROT,
+			nullptr,	// TOKK_AMP,
+			nullptr,	// TOKK_STAR,
+			nullptr,	// TOKK_LPAREN,
+			nullptr,	// TOKK_RPAREN,
+			nullptr,	// TOKK_PLUS,
+			nullptr,	// TOKK_HBAR,
+			nullptr,	// TOKK_EQUAL,
+			nullptr,	// TOKK_VBAR,
+			nullptr,	// TOKK_LBRACK,
+			nullptr,	// TOKK_RBRACK,
+			nullptr,	// TOKK_LBRACE,
+			nullptr,	// TOKK_RBRACE,
+			nullptr,	// TOKK_SEMICOLON,
+			nullptr,	// TOKK_COLON,
+			nullptr,	// TOKK_COMMA,
+			nullptr,	// TOKK_LT,
+			nullptr,	// TOKK_GT,
+			nullptr,	// TOKK_DOT,
+			nullptr,	// TOKK_FSLASH,
+			nullptr,	// TOKK_QMARK
 		};
 		CASSERT(DIM(s_mpTokkChr) == TOKK_Max);
 
-		while (m_iChrCur < m_strInput.length())
+		while (ChrCur() != EOF)
 		{
 			// skip white space
 
 			if(isspace(ChrCur()))
 			{
-				ReadChr();
+				ConsumeChar();
 				continue;
 			}
 			
 			// check for escape sequence
 			
-			if(ChrCur() == '\\' && m_iChrCur != m_strInput.length())
+			if(ChrCur() == '\\')
 			{
-				if(m_iChrCur != m_strInput.length())
-				{
-					ReadChr();
-
-					if(ChrCur() == '\\')
-						return m_parsetree.PTNodeCreate(TOKK_ESC_BSLASH);
-					else if(ChrCur() == '\'')
-						return m_parsetree.PTNodeCreate(TOKK_ESC_TICK);
-				}
+				string strTok = "";
+				strTok += ConsumeChar();
+				char chrNext = ConsumeChar();
+				strTok += chrNext;
+				
+				if(chrNext == '\\')
+					return m_parsetree.PTNodeCreate(TOKK_ESC_BSLASH, strTok);
+				else if(chrNext == '\'')
+					return m_parsetree.PTNodeCreate(TOKK_ESC_TICK, strTok);
 
 				assert(false);
 			}
 			
 			// check for single symbol
 			
-			for(TOKK tokk = TOKK_Min; tokk < TOKK_Max; ++tokk)
+			for(TOKK tokk = TOKK_Min; tokk < TOKK_Max; tokk = (TOKK)((int)tokk + 1))
 			{
 				char chrTest = s_mpTokkChr[tokk];
 				if(chrTest != 0 && ChrCur() == chrTest)
-					return m_parsetree.PTNodeCreate(tokk, string(1, ChrCur()));
+				{
+					return m_parsetree.PTNodeCreate(tokk, string(1, ConsumeChar()));
+				}
 			}
 
-			// check for num
+			// check for string
 			
-			if(isdigit(ChrCur()))
+			if(ChrCur() == '"')
 			{
-				string strNum = "";
+				ConsumeChar();
+				
+				string str = "";
 
-				while(isdigit(ChrCur()))
+				while(ChrCur() != '"' && ChrCur() != '\n' && ChrCur() != '\r' && ChrCur() != '\v' && ChrCur() != '\f' )
 				{
-					strNum+=ChrCur();
-					ReadChr();
+					str += ConsumeChar();
 				}
 
-				return m_parsetree.PTNodeCreate(TOKK_NUM, strNum);
+				if(ChrCur() != '"')
+				{
+					assert(false);
+				}
+
+				ConsumeChar();
+
+				return m_parsetree.PTNodeCreate(TOKK_STRING, str);
 			}
 			
 			// check for keyword or ID
 
 			bool fHasNum = false;
-			if(isalpha(ChrCur()))
+			if(isalpha(ChrCur()) || ChrCur() == '_')
 			{
 				string strTok = "";
 				
@@ -463,16 +372,15 @@ struct STokenizer // tag = tokenizer
 						fHasNum = true;
 					}
 
-					strTok+=ChrCur();
-					ReadChr();
+					strTok+=ConsumeChar();
 				}
 
 				if(!fHasNum)
 				{
-					for(TOKK tokk = TOKK_Min; tokk < TOKK_Max; ++tokk)
+					for(TOKK tokk = TOKK_Min; tokk < TOKK_Max; tokk = (TOKK)((int)tokk + 1))
 					{
 						const char * pChzTest = s_mpTokkPChz[tokk];
-						if(pChzTest && strcmp(pChzTest, strTok.c_str()))
+						if(pChzTest && strcmp(pChzTest, strTok.c_str()) == 0)
 							return m_parsetree.PTNodeCreate(tokk, string(pChzTest)); // keyword
 					}
 				}
@@ -493,22 +401,23 @@ struct STokenizer // tag = tokenizer
 		return m_chrCur;
 	}
 
-	void ReadChr()
+	char ConsumeChar()
 	{
-		m_chrCur = m_strInput[m_iChrCur];
-		m_iChrCur++;
+		char chrPrev = m_chrCur;
+		m_chrCur = (char)fgetc(m_pFile);
+
+		return chrPrev;
 	}
 
-	void SetInput(string str)
+	void SetInput(FILE * pFile)
 	{
-		m_strInput = str;
-		m_iChrCur = 0;
-		ReadChr();
+		m_pFile = pFile;
+		fseek(m_pFile, 0, SEEK_SET);
+		ConsumeChar();
 	}
 
 	char m_chrCur;
-	string			m_strInput;
-	unsigned int	m_iChrCur;
+	FILE *			m_pFile;
 
 	SParseTree		m_parsetree;
 };
@@ -579,10 +488,13 @@ struct SParser
 			pRNode->AddChild(PRNodePostfixOperator());
 		}
 
-		while(TokkCur() == TOKK_VBAR)
+		while(TokkCur() == TOKK_VBAR || TokkCur() == TOKK_ID || TokkCur() == TOKK_LPAREN || TokkCur() == TOKK_KW_ID || TokkCur() == TOKK_KW_STRING)
 		{
-			pRNode->AddChild(m_pTNodeCur);
-			ReadToken();
+			if(TokkCur() == TOKK_VBAR)
+			{
+				pRNode->AddChild(m_pTNodeCur);
+				ReadToken();
+			}
 
 			pRNode->AddChild(PRNodeAtom());
 
@@ -591,6 +503,8 @@ struct SParser
 				pRNode->AddChild(PRNodePostfixOperator());
 			}
 		}
+
+		return pRNode;
 	}
 
 	SParseTree::SRuleNode * PRNodePostfixOperator()
@@ -640,7 +554,7 @@ struct SParser
 
 	SParseTree::SRuleNode * PRNodeBuiltInToken()
 	{
-		if(TokkCur() == TOKK_KW_ID || TokkCur() == TOKK_KW_NUM)
+		if(TokkCur() == TOKK_KW_ID || TokkCur() == TOKK_KW_STRING)
 		{
 			SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_builtinToken);
 
@@ -684,19 +598,18 @@ struct SParser
 	{
 		SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_tokenLiteral);
 		
+		if(TokkCur() == TOKK_STRING)
+		{
+			pRNode->AddChild(m_pTNodeCur);
+			ReadToken();
+			return pRNode;
+		}
+		
 		assert(TokkCur() == TOKK_TICK);
 		pRNode->AddChild(m_pTNodeCur);
 		ReadToken();
 
-		if(TokkCur() == TOKK_ID)
-		{
-			pRNode->AddChild(m_pTNodeCur);
-			ReadToken();
-		}
-		else
-		{
-			pRNode->AddChild(PRNodeTokenSymbol());
-		}
+		pRNode->AddChild(PRNodeTokenSymbol());
 
 		assert(TokkCur() == TOKK_TICK);
 		pRNode->AddChild(m_pTNodeCur);
@@ -723,7 +636,6 @@ struct SParser
 			TOKK_STAR,
 			TOKK_LPAREN,
 			TOKK_RPAREN,
-			TOKK_UBAR,
 			TOKK_PLUS,
 			TOKK_HBAR,
 			TOKK_EQUAL,
@@ -777,6 +689,8 @@ struct SParser
 
 			break;
 		}
+
+		return pRNode;
 	}
 
 	SParseTree::SRuleNode * PRNodeTokenEscapedSymbolChar()
@@ -812,7 +726,6 @@ struct SParser
 			TOKK_STAR,
 			TOKK_LPAREN,
 			TOKK_RPAREN,
-			TOKK_UBAR,
 			TOKK_PLUS,
 			TOKK_HBAR,
 			TOKK_EQUAL,
@@ -856,7 +769,7 @@ struct SParser
 
 	TOKK TokkCur()
 	{
-		return m_pTNodeCur->m_tokk;
+		return m_pTNodeCur ? m_pTNodeCur->m_tokk : TOKK_Nil;
 	}
 	
 	SParseTree * PParseTree()
@@ -864,9 +777,9 @@ struct SParser
 		return &m_tokenizer.m_parsetree;
 	}
 
-	void SetInput(string strInput)
+	void SetInput(FILE * pFile)
 	{
-		m_tokenizer.SetInput(strInput);
+		m_tokenizer.SetInput(pFile);
 		ReadToken();
 	}
 
@@ -874,7 +787,19 @@ struct SParser
 	STokenizer m_tokenizer;
 };
 
-int local_main()
+int main()
 {
+	const char * pChzFileName = "gfile.gfile";
+
+	FILE * pFile = fopen(pChzFileName, "r");
+
+	SParser parser;
+
+	parser.SetInput(pFile);
+
+	SParseTree::SRuleNode * pRNodeGrammar = parser.PRNodeGrammar();
+
+	pRNodeGrammar->PrintDebug();
+
 	return 0;
 }

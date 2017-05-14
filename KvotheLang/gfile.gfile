@@ -1,0 +1,112 @@
+Rule grammar
+	: (rule | token) +
+	;
+
+Rule rule
+	: KW_RULE ID COLON ruleBody SEMICOLON
+	;
+	
+Rule ruleBody
+	: atom postfixOperator? (VBAR? atom postfixOperator?)* 
+	;
+
+Rule postfixOperator
+	: QMARK
+	| PLUS
+	| STAR
+	;
+	
+Rule atom 
+	: builtinToken
+	| ID
+	| LPAREN ruleBody RPAREN
+	;
+	
+Rule builtinToken 
+	: KW_ID
+	| KW_STRING
+	;
+	
+Rule token
+	: KW_TOKEN ID COLON tokenLiteral SEMICOLON
+	;
+	
+Rule tokenLiteral
+	: STRING | TICK symbol TICK 
+	;
+	
+Rule symbol
+	: (escapedSymbolChar | unescapedSymbolChar) +
+	;
+	
+Rule escapedSymbolChar
+	: ESC_BSLASH | ESC_TICK
+	;
+	
+Rule unescapedSymbolChar
+	: BTICK		
+	| TILDE		
+	| BANG		
+	| AT		
+	| HASH		
+	| DOLLAR	
+	| PERCENT	
+	| CARROT	
+	| AMP		
+	| STAR		
+	| LPAREN	
+	| RPAREN		
+	| PLUS		
+	| HBAR		
+	| EQUAL		
+	| VBAR		
+	| LBRACK	
+	| RBRACK	
+	| LBRACE	
+	| RBRACE	
+	| SEMICOLON	
+	| COLON		
+	| COMMA		
+	| LT		
+	| GT		
+	| DOT		
+	| FSLASH	
+	| QMARK		
+	;
+
+Token ESC_BSLASH: '\\\\';
+Token ESC_TICK	: '\\\'';
+Token TICK 		: '\'';
+Token BTICK		: '`' ;
+Token TILDE		: '~' ;
+Token BANG		: '!' ;
+Token AT		: '@' ;
+Token HASH		: '#' ;
+Token DOLLAR	: '$' ;
+Token PERCENT	: '%' ;
+Token CARROT	: '^' ;
+Token AMP		: '&' ;
+Token STAR		: '*' ;
+Token LPAREN	: '(' ;
+Token RPAREN	: ')' ;
+Token PLUS		: '+' ;
+Token HBAR		: '-' ;
+Token EQUAL		: '=' ;
+Token VBAR		: '|' ;
+Token LBRACK	: '[' ;
+Token RBRACK	: ']' ;
+Token LBRACE	: '{' ;
+Token RBRACE	: '}' ;
+Token SEMICOLON	: ';' ;
+Token COLON		: ':' ;
+Token COMMA		: ',' ;
+Token LT		: '<' ;
+Token GT		: '>' ;
+Token DOT		: '.' ;
+Token FSLASH	: '/' ;
+Token QMARK		: '?' ;
+
+Token KW_RULE 	: "Rule";
+Token KW_TOKEN 	: "Token";
+Token KW_ID 	: "ID";
+Token KW_STRING : "STRING";
