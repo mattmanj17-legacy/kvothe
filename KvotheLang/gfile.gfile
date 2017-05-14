@@ -39,7 +39,8 @@ Rule builtinToken
 	| KW_RPAREN		
 	| KW_PLUS		
 	| KW_HBAR		
-	| KW_EQUAL		
+	| KW_EQUAL	
+	| KW_BSLASH
 	| KW_VBAR		
 	| KW_LBRACK	
 	| KW_RBRACK	
@@ -61,6 +62,7 @@ Rule keyword
 
 Keyword KW_RULE 		: "Rule";
 Keyword KW_KEYWORD		: "Keyword";
+
 Keyword KW_ID 			: "ID";
 Keyword KW_STRING		: "STRING";
 Keyword KW_BTICK		: "BTICK";	
@@ -78,6 +80,7 @@ Keyword KW_RPAREN		: "RPAREN";
 Keyword KW_PLUS			: "PLUS";
 Keyword KW_HBAR			: "HBAR";
 Keyword KW_EQUAL		: "EQUAL";
+Keyword KW_BSLASH		: "BSLASH";
 Keyword KW_VBAR			: "VBAR";
 Keyword KW_LBRACK		: "LBRACK";
 Keyword KW_RBRACK		: "RBRACK";

@@ -18,15 +18,43 @@ using std::shared_ptr;
 
 enum TOKK
 {
+	TOKK_KW_RULE,
+	TOKK_KW_KEYWORD,
+
+	TOKK_KW_ID,
+	TOKK_KW_STRING,
+	TOKK_KW_BTICK,
+	TOKK_KW_TILDE,
+	TOKK_KW_BANG,
+	TOKK_KW_AT,
+	TOKK_KW_HASH,
+	TOKK_KW_DOLLAR,
+	TOKK_KW_PERCENT,
+	TOKK_KW_CARROT,
+	TOKK_KW_AMP,
+	TOKK_KW_STAR,
+	TOKK_KW_LPAREN,
+	TOKK_KW_RPAREN,
+	TOKK_KW_PLUS,
+	TOKK_KW_HBAR,
+	TOKK_KW_EQUAL,
+	TOKK_KW_BSLASH,
+	TOKK_KW_VBAR,
+	TOKK_KW_LBRACK,
+	TOKK_KW_RBRACK,
+	TOKK_KW_LBRACE,
+	TOKK_KW_RBRACE,
+	TOKK_KW_SEMICOLON,
+	TOKK_KW_COLON,
+	TOKK_KW_COMMA,
+	TOKK_KW_LT,
+	TOKK_KW_GT,
+	TOKK_KW_DOT,
+	TOKK_KW_FSLASH,
+	TOKK_KW_QMARK,
+	
 	TOKK_ID,	
 	TOKK_STRING,
-	TOKK_KW_RULE, 	
-	TOKK_KW_TOKEN,
-	TOKK_KW_ID,	
-	TOKK_KW_STRING, 	
-	TOKK_ESC_BSLASH,
-	TOKK_ESC_TICK,
-	TOKK_TICK,
 	TOKK_BTICK,
 	TOKK_TILDE,
 	TOKK_BANG,
@@ -42,6 +70,7 @@ enum TOKK
 	TOKK_PLUS,
 	TOKK_HBAR,
 	TOKK_EQUAL,
+	TOKK_BSLASH,
 	TOKK_VBAR,
 	TOKK_LBRACK,
 	TOKK_RBRACK,
@@ -71,16 +100,31 @@ enum RULEK
 	RULEK_postfixOperator,
 	RULEK_atom,
 	RULEK_builtinToken,
-	RULEK_token,
-	RULEK_tokenLiteral,
-	RULEK_symbol,
-	RULEK_escapedSymbolChar,
-	RULEK_unescapedSymbolChar,
+	RULEK_keyword,
 
 	RULEK_Max,
 	RULEK_Nil = -1,
 	RULEK_Min = 0
 };
+
+const char * PChzFromRulek(RULEK rulek)
+{
+	const char * aPchzRulek[] =
+	{
+		"RULEK_grammar",
+		"RULEK_rule",
+		"RULEK_ruleBody",
+		"RULEK_postfixOperator",
+		"RULEK_atom",
+		"RULEK_builtinToken",
+		"RULEK_keyword",
+	};
+	CASSERT(DIM(aPchzRulek) == RULEK_Max);
+
+	assert(rulek >= 0 && rulek < RULEK_Max);
+
+	return aPchzRulek[rulek];
+}
 
 // parse node kind
 
@@ -142,7 +186,7 @@ struct SParseTree // tag = parsetree
 
 		void PrintDebug() override
 		{
-			printf("(");
+			printf("(%s", PChzFromRulek(m_rulek));
 
 			for(SParseNode * pNodeChild : m_aryPNodeChild)
 			{
@@ -150,7 +194,7 @@ struct SParseTree // tag = parsetree
 				pNodeChild->PrintDebug();
 			}
 
-			printf(" )");
+			printf(")");
 		}
 
 		RULEK Rulek() override { return m_rulek; }
@@ -213,15 +257,44 @@ struct STokenizer // tag = tokenizer
 	{
 		static char s_mpTokkChr [] =
 		{
-			0,		// TOKK_ID,	
+			0,		// TOKK_KW_RULE,
+			0,		// TOKK_KW_KEYWORD,
+			
+			0,		// TOKK_KW_ID,
+			0,		// TOKK_KW_STRING,
+			0,		// TOKK_KW_BTICK,
+			0,		// TOKK_KW_TILDE,
+			0,		// TOKK_KW_BANG,
+			0,		// TOKK_KW_AT,
+			0,		// TOKK_KW_HASH,
+			0,		// TOKK_KW_DOLLAR,
+			0,		// TOKK_KW_PERCENT,
+			0,		// TOKK_KW_CARROT,
+			0,		// TOKK_KW_AMP,
+			0,		// TOKK_KW_STAR,
+			0,		// TOKK_KW_LPAREN,
+			0,		// TOKK_KW_RPAREN,
+			0,		// TOKK_KW_PLUS,
+			0,		// TOKK_KW_HBAR,
+			0,		// TOKK_KW_EQUAL,
+			0,		// TOKK_KW_BSLASH,
+			0,		// TOKK_KW_VBAR,
+			0,		// TOKK_KW_LBRACK,
+			0,		// TOKK_KW_RBRACK,
+			0,		// TOKK_KW_LBRACE,
+			0,		// TOKK_KW_RBRACE,
+			0,		// TOKK_KW_SEMICOLON,
+			0,		// TOKK_KW_COLON,
+			0,		// TOKK_KW_COMMA,
+			0,		// TOKK_KW_LT,
+			0,		// TOKK_KW_GT,
+			0,		// TOKK_KW_DOT,
+			0,		// TOKK_KW_FSLASH,
+			0,		// TOKK_KW_QMARK,
+
+			0,		// TOKK_ID,
 			0,		// TOKK_STRING,
-			0,		// TOKK_KW_RULE, 	
-			0,		// TOKK_KW_TOKEN,
-			0,		// TOKK_KW_ID,	
-			0,		// TOKK_KW_STRING, 	
-			0,		// TOKK_ESC_BSLASH,
-			0,		// TOKK_ESC_TICK,
-			'\'',	// TOKK_TICK,
+
 			'`',	// TOKK_BTICK,
 			'~',	// TOKK_TILDE,
 			'!',	// TOKK_BANG,
@@ -237,6 +310,7 @@ struct STokenizer // tag = tokenizer
 			'+',	// TOKK_PLUS,
 			'-',	// TOKK_HBAR,
 			'=',	// TOKK_EQUAL,
+			'\\',	// TOKK_BSLASH
 			'|',	// TOKK_VBAR,
 			'[',	// TOKK_LBRACK,
 			']',	// TOKK_RBRACK,
@@ -255,84 +329,78 @@ struct STokenizer // tag = tokenizer
 
 		static const char * s_mpTokkPChz [] =
 		{
-			nullptr,	// TOKK_ID,	
-			nullptr,	// TOKK_STRING,
-			"Rule",		// TOKK_KW_RULE, 	
-			"Token",	// TOKK_KW_TOKEN,
-			"ID",		// TOKK_KW_ID,	
-			"STRING",	// TOKK_KW_STRING, 	
-			nullptr,	// TOKK_ESC_BSLASH,
-			nullptr,	// TOKK_ESC_TICK,
-			nullptr,	// TOKK_TICK,
-			nullptr,	// TOKK_BTICK,
-			nullptr,	// TOKK_TILDE,
-			nullptr,	// TOKK_BANG,
-			nullptr,	// TOKK_AT,
-			nullptr,	// TOKK_HASH,
-			nullptr,	// TOKK_DOLLAR,
-			nullptr,	// TOKK_PERCENT,
-			nullptr,	// TOKK_CARROT,
-			nullptr,	// TOKK_AMP,
-			nullptr,	// TOKK_STAR,
-			nullptr,	// TOKK_LPAREN,
-			nullptr,	// TOKK_RPAREN,
-			nullptr,	// TOKK_PLUS,
-			nullptr,	// TOKK_HBAR,
-			nullptr,	// TOKK_EQUAL,
-			nullptr,	// TOKK_VBAR,
-			nullptr,	// TOKK_LBRACK,
-			nullptr,	// TOKK_RBRACK,
-			nullptr,	// TOKK_LBRACE,
-			nullptr,	// TOKK_RBRACE,
-			nullptr,	// TOKK_SEMICOLON,
-			nullptr,	// TOKK_COLON,
-			nullptr,	// TOKK_COMMA,
-			nullptr,	// TOKK_LT,
-			nullptr,	// TOKK_GT,
-			nullptr,	// TOKK_DOT,
-			nullptr,	// TOKK_FSLASH,
-			nullptr,	// TOKK_QMARK
+			"Rule",			// TOKK_KW_RULE,
+			"Keyword",		// TOKK_KW_KEYWORD,
+			
+			"ID",			// TOKK_KW_ID,
+			"STRING",		// TOKK_KW_STRING,
+			"BTICK",		// TOKK_KW_BTICK,
+			"TILDE",		// TOKK_KW_TILDE,
+			"BANG",			// TOKK_KW_BANG,
+			"AT",			// TOKK_KW_AT,
+			"HASH",			// TOKK_KW_HASH,
+			"DOLLAR",		// TOKK_KW_DOLLAR,
+			"PERCENT",		// TOKK_KW_PERCENT,
+			"CARROT",		// TOKK_KW_CARROT,
+			"AMP",			// TOKK_KW_AMP,
+			"STAR",			// TOKK_KW_STAR,
+			"LPAREN",		// TOKK_KW_LPAREN,
+			"RPAREN",		// TOKK_KW_RPAREN,
+			"PLUS",			// TOKK_KW_PLUS,
+			"HBAR",			// TOKK_KW_HBAR,
+			"EQUAL",		// TOKK_KW_EQUAL,
+			"VBAR",			// TOKK_KW_VBAR,
+			"LBRACK",		// TOKK_KW_LBRACK,
+			"RBRACK",		// TOKK_KW_RBRACK,
+			"LBRACE",		// TOKK_KW_LBRACE,
+			"RBRACE",		// TOKK_KW_RBRACE,
+			"SEMICOLON",	// TOKK_KW_SEMICOLON,
+			"COLON",		// TOKK_KW_COLON,
+			"COMMA",		// TOKK_KW_COMMA,
+			"LT",			// TOKK_KW_LT,
+			"GT",			// TOKK_KW_GT,
+			"DOT",			// TOKK_KW_DOT,
+			"FSLASH",		// TOKK_KW_FSLASH,
+			"QMARK",		// TOKK_KW_QMARK,
+
+			nullptr,		// TOKK_ID,
+			nullptr,		// TOKK_STRING,
+
+			nullptr,		// TOKK_BTICK,
+			nullptr,		// TOKK_TILDE,
+			nullptr,		// TOKK_BANG,
+			nullptr,		// TOKK_AT,
+			nullptr,		// TOKK_HASH,
+			nullptr,		// TOKK_DOLLAR,
+			nullptr,		// TOKK_PERCENT,
+			nullptr,		// TOKK_CARROT,
+			nullptr,		// TOKK_AMP,
+			nullptr,		// TOKK_STAR,
+			nullptr,		// TOKK_LPAREN,
+			nullptr,		// TOKK_RPAREN,
+			nullptr,		// TOKK_PLUS,
+			nullptr,		// TOKK_HBAR,
+			nullptr,		// TOKK_EQUAL,
+			nullptr,		// TOKK_VBAR,
+			nullptr,		// TOKK_LBRACK,
+			nullptr,		// TOKK_RBRACK,
+			nullptr,		// TOKK_LBRACE,
+			nullptr,		// TOKK_RBRACE,
+			nullptr,		// TOKK_SEMICOLON,
+			nullptr,		// TOKK_COLON,
+			nullptr,		// TOKK_COMMA,
+			nullptr,		// TOKK_LT,
+			nullptr,		// TOKK_GT,
+			nullptr,		// TOKK_DOT,
+			nullptr,		// TOKK_FSLASH,
+			nullptr,		// TOKK_QMARK
 		};
 		CASSERT(DIM(s_mpTokkChr) == TOKK_Max);
 
+		// BB handle character literals and escape characters
+		
 		while (ChrCur() != EOF)
 		{
-			// skip white space
-
-			if(isspace(ChrCur()))
-			{
-				ConsumeChar();
-				continue;
-			}
-			
-			// check for escape sequence
-			
-			if(ChrCur() == '\\')
-			{
-				string strTok = "";
-				strTok += ConsumeChar();
-				char chrNext = ConsumeChar();
-				strTok += chrNext;
-				
-				if(chrNext == '\\')
-					return m_parsetree.PTNodeCreate(TOKK_ESC_BSLASH, strTok);
-				else if(chrNext == '\'')
-					return m_parsetree.PTNodeCreate(TOKK_ESC_TICK, strTok);
-
-				assert(false);
-			}
-			
-			// check for single symbol
-			
-			for(TOKK tokk = TOKK_Min; tokk < TOKK_Max; tokk = (TOKK)((int)tokk + 1))
-			{
-				char chrTest = s_mpTokkChr[tokk];
-				if(chrTest != 0 && ChrCur() == chrTest)
-				{
-					return m_parsetree.PTNodeCreate(tokk, string(1, ConsumeChar()));
-				}
-			}
-
 			// check for string
 			
 			if(ChrCur() == '"')
@@ -355,32 +423,42 @@ struct STokenizer // tag = tokenizer
 
 				return m_parsetree.PTNodeCreate(TOKK_STRING, str);
 			}
-			
-			// check for keyword or ID
 
-			bool fHasNum = false;
-			if(isalpha(ChrCur()) || ChrCur() == '_')
+			// skip white space
+
+			if(isspace(ChrCur()))
 			{
+				ConsumeChar();
+				continue;
+			}
+
+			// check for single symbol
+			
+			for(TOKK tokk = TOKK_Min; tokk < TOKK_Max; tokk = (TOKK)((int)tokk + 1))
+			{
+				char chrTest = s_mpTokkChr[tokk];
+				if(chrTest != 0 && ChrCur() == chrTest)
+				{
+					return m_parsetree.PTNodeCreate(tokk, string(1, ConsumeChar()));
+				}
+			}
+			
+			if (ChrCur() == '_' || isdigit(ChrCur()) || isalpha(ChrCur()))
+			{
+				// check for keyword or ID
+			
 				string strTok = "";
 				
 				while(ChrCur() == '_' || isdigit(ChrCur()) || isalpha(ChrCur()))
 				{
-					if(isdigit(ChrCur()))
-					{
-						fHasNum = true;
-					}
-
 					strTok+=ConsumeChar();
 				}
 
-				if(!fHasNum)
+				for(TOKK tokk = TOKK_Min; tokk < TOKK_Max; tokk = (TOKK)((int)tokk + 1))
 				{
-					for(TOKK tokk = TOKK_Min; tokk < TOKK_Max; tokk = (TOKK)((int)tokk + 1))
-					{
-						const char * pChzTest = s_mpTokkPChz[tokk];
-						if(pChzTest && strcmp(pChzTest, strTok.c_str()) == 0)
-							return m_parsetree.PTNodeCreate(tokk, string(pChzTest)); // keyword
-					}
+					const char * pChzTest = s_mpTokkPChz[tokk];
+					if(pChzTest && strcmp(pChzTest, strTok.c_str()) == 0)
+						return m_parsetree.PTNodeCreate(tokk, string(pChzTest)); // keyword
 				}
 
 				return m_parsetree.PTNodeCreate(TOKK_ID, strTok); // ID
@@ -388,10 +466,10 @@ struct STokenizer // tag = tokenizer
 
 			// unrecognized char
 
-			assert(false);
+			assert(false);	
 		}
 
-		return nullptr;
+		return nullptr; // BB return EOF/EOI token instead?
 	}
 
 	char ChrCur()
@@ -430,20 +508,20 @@ struct SParser
 		{
 			pRNode->AddChild(PRNodeRule());
 		}
-		else if(TokkCur() == TOKK_KW_TOKEN)
+		else if(TokkCur() == TOKK_KW_KEYWORD)
 		{
-			pRNode->AddChild(PRNodeToken());
+			pRNode->AddChild(PRNodeKeyword());
 		}
 
-		while(TokkCur() == TOKK_KW_RULE || TokkCur() == TOKK_KW_TOKEN)
+		while(TokkCur() == TOKK_KW_RULE || TokkCur() == TOKK_KW_KEYWORD)
 		{
 			if(TokkCur() == TOKK_KW_RULE)
 			{
 				pRNode->AddChild(PRNodeRule());
 			}
-			else if(TokkCur() == TOKK_KW_TOKEN)
+			else if(TokkCur() == TOKK_KW_KEYWORD)
 			{
-				pRNode->AddChild(PRNodeToken());
+				pRNode->AddChild(PRNodeKeyword());
 			}
 		}
 
@@ -486,7 +564,7 @@ struct SParser
 			pRNode->AddChild(PRNodePostfixOperator());
 		}
 
-		while(TokkCur() == TOKK_VBAR || TokkCur() == TOKK_ID || TokkCur() == TOKK_LPAREN || TokkCur() == TOKK_KW_ID || TokkCur() == TOKK_KW_STRING)
+		while(TokkCur() == TOKK_VBAR || TokkCur() == TOKK_ID || TokkCur() == TOKK_LPAREN || (TokkCur() < TOKK_ID && TokkCur() >= TOKK_KW_KEYWORD))
 		{
 			if(TokkCur() == TOKK_VBAR)
 			{
@@ -552,26 +630,61 @@ struct SParser
 
 	SParseTree::SRuleNode * PRNodeBuiltInToken()
 	{
-		if(TokkCur() == TOKK_KW_ID || TokkCur() == TOKK_KW_STRING)
+		TOKK aTokk[] = 
 		{
-			SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_builtinToken);
+			TOKK_KW_ID,
+			TOKK_KW_STRING,
+			TOKK_KW_BTICK,
+			TOKK_KW_TILDE,
+			TOKK_KW_BANG,
+			TOKK_KW_AT,
+			TOKK_KW_HASH,
+			TOKK_KW_DOLLAR,
+			TOKK_KW_PERCENT,
+			TOKK_KW_CARROT,
+			TOKK_KW_AMP,
+			TOKK_KW_STAR,
+			TOKK_KW_LPAREN,
+			TOKK_KW_RPAREN,
+			TOKK_KW_PLUS,
+			TOKK_KW_HBAR,
+			TOKK_KW_EQUAL,
+			TOKK_KW_VBAR,
+			TOKK_KW_LBRACK,
+			TOKK_KW_RBRACK,
+			TOKK_KW_LBRACE,
+			TOKK_KW_RBRACE,
+			TOKK_KW_SEMICOLON,
+			TOKK_KW_COLON,
+			TOKK_KW_COMMA,
+			TOKK_KW_LT,
+			TOKK_KW_GT,
+			TOKK_KW_DOT,
+			TOKK_KW_FSLASH,
+			TOKK_KW_QMARK,
+		};
 
-			pRNode->AddChild(m_pTNodeCur);
+		for(TOKK tokk : aTokk)
+		{
+			if(TokkCur() == tokk)
+			{
+				SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_builtinToken);
+				pRNode->AddChild(m_pTNodeCur);
+				ReadToken();
 
-			ReadToken();
-
-			return pRNode;
+				return pRNode;
+			}
 		}
-
+		
 		assert(false);
 		return nullptr;
 	}
 
-	SParseTree::SRuleNode * PRNodeToken()
+	SParseTree::SRuleNode * PRNodeKeyword()
 	{
-		SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_token);
+		SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_keyword);
 		
-		assert(TokkCur() == TOKK_KW_TOKEN);
+		assert(TokkCur() == TOKK_KW_KEYWORD);
 		pRNode->AddChild(m_pTNodeCur);
 		ReadToken();
 
@@ -583,181 +696,15 @@ struct SParser
 		pRNode->AddChild(m_pTNodeCur);
 		ReadToken();
 
-		pRNode->AddChild(PRNodeTokenLiteral());
+		assert(TokkCur() == TOKK_STRING);
+		pRNode->AddChild(m_pTNodeCur);
+		ReadToken();
 
 		assert(TokkCur() == TOKK_SEMICOLON);
 		pRNode->AddChild(m_pTNodeCur);
 		ReadToken();
 
 		return pRNode;
-	}
-
-	SParseTree::SRuleNode * PRNodeTokenLiteral()
-	{
-		SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_tokenLiteral);
-		
-		if(TokkCur() == TOKK_STRING)
-		{
-			pRNode->AddChild(m_pTNodeCur);
-			ReadToken();
-			return pRNode;
-		}
-		
-		assert(TokkCur() == TOKK_TICK);
-		pRNode->AddChild(m_pTNodeCur);
-		ReadToken();
-
-		pRNode->AddChild(PRNodeTokenSymbol());
-
-		assert(TokkCur() == TOKK_TICK);
-		pRNode->AddChild(m_pTNodeCur);
-		ReadToken();
-
-		return pRNode;
-	}
-
-	SParseTree::SRuleNode * PRNodeTokenSymbol()
-	{
-		SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_symbol);
-		
-		TOKK aTokk[] =
-		{
-			TOKK_BTICK,
-			TOKK_TILDE,
-			TOKK_BANG,
-			TOKK_AT,
-			TOKK_HASH,
-			TOKK_DOLLAR,
-			TOKK_PERCENT,
-			TOKK_CARROT,
-			TOKK_AMP,
-			TOKK_STAR,
-			TOKK_LPAREN,
-			TOKK_RPAREN,
-			TOKK_PLUS,
-			TOKK_HBAR,
-			TOKK_EQUAL,
-			TOKK_VBAR,
-			TOKK_LBRACK,
-			TOKK_RBRACK,
-			TOKK_LBRACE,
-			TOKK_RBRACE,
-			TOKK_SEMICOLON,
-			TOKK_COLON,
-			TOKK_COMMA,
-			TOKK_LT,
-			TOKK_GT,
-			TOKK_DOT,
-			TOKK_FSLASH,
-			TOKK_QMARK,
-		};
-		
-		if(TokkCur() == TOKK_ESC_BSLASH || TokkCur() == TOKK_ESC_TICK)
-		{
-			pRNode->AddChild(PRNodeTokenEscapedSymbolChar());
-		}
-		else
-		{
-			pRNode->AddChild(PRNodeTokenUnescapedSymbolChar());
-		}
-
-		while(true)
-		{
-			if(TokkCur() == TOKK_ESC_BSLASH || TokkCur() == TOKK_ESC_TICK)
-			{
-				pRNode->AddChild(PRNodeTokenEscapedSymbolChar());
-				continue;
-			}
-
-			bool fIsSymbolChar = false;
-			for(TOKK tokk : aTokk)
-			{
-				if(tokk == TokkCur())
-				{
-					fIsSymbolChar = true;
-					break;
-				}
-			}
-
-			if(fIsSymbolChar)
-			{
-				pRNode->AddChild(PRNodeTokenUnescapedSymbolChar());
-				continue;
-			}
-
-			break;
-		}
-
-		return pRNode;
-	}
-
-	SParseTree::SRuleNode * PRNodeTokenEscapedSymbolChar()
-	{
-		if(TokkCur() == TOKK_ESC_BSLASH || TokkCur() == TOKK_ESC_TICK)
-		{
-			SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_escapedSymbolChar);
-
-			pRNode->AddChild(m_pTNodeCur);
-
-			ReadToken();
-
-			return pRNode;
-		}
-
-		assert(false);
-		return nullptr;
-	}
-
-	SParseTree::SRuleNode * PRNodeTokenUnescapedSymbolChar()
-	{
-		TOKK aTokk[] =
-		{
-			TOKK_BTICK,
-			TOKK_TILDE,
-			TOKK_BANG,
-			TOKK_AT,
-			TOKK_HASH,
-			TOKK_DOLLAR,
-			TOKK_PERCENT,
-			TOKK_CARROT,
-			TOKK_AMP,
-			TOKK_STAR,
-			TOKK_LPAREN,
-			TOKK_RPAREN,
-			TOKK_PLUS,
-			TOKK_HBAR,
-			TOKK_EQUAL,
-			TOKK_VBAR,
-			TOKK_LBRACK,
-			TOKK_RBRACK,
-			TOKK_LBRACE,
-			TOKK_RBRACE,
-			TOKK_SEMICOLON,
-			TOKK_COLON,
-			TOKK_COMMA,
-			TOKK_LT,
-			TOKK_GT,
-			TOKK_DOT,
-			TOKK_FSLASH,
-			TOKK_QMARK,
-		};
-
-		for(TOKK tokk : aTokk)
-		{
-			if(tokk == TokkCur())
-			{
-				SParseTree::SRuleNode * pRNode = PParseTree()->PRNodeCreate(RULEK_unescapedSymbolChar);
-
-				pRNode->AddChild(m_pTNodeCur);
-
-				ReadToken();
-
-				return pRNode;
-			}
-		}
-
-		assert(false);
-		return nullptr;
 	}
 
 	void ReadToken()
