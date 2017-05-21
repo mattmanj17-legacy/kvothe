@@ -3,11 +3,10 @@
 #include <vector>
 #include <string>
 #include <stdio.h>
+#include <assert.h>
 
 using std::vector;
 using std::string;
-
-#include "macros.h"
 
 struct SRegex // tag = regex
 {
@@ -466,7 +465,7 @@ struct SParser
 		while(FChrIsValidSetChrStart())
 		{
 			unsigned char chrBegin = ChrConsumeSet();
-			unsigned char chrEnd = chrBegin + 1;
+			unsigned char chrEnd = chrBegin;
 
 			if(ChrCur() == '-')
 			{
@@ -475,7 +474,7 @@ struct SParser
 				assert(chrEnd > chrBegin);
 			}
 
-			for(; chrBegin < chrEnd; ++chrBegin)
+			for(; chrBegin <= chrEnd; ++chrBegin)
 			{
 				mpChrFIncluded[chrBegin] = !fNegate;
 			}
@@ -483,7 +482,7 @@ struct SParser
 
 		MatchChr(']');
 
-		// convert mpChrF to a union or ranges
+		// convert mpChrF to a union of ranges
 
 		SUnion * pUnion = new SUnion();
 		
