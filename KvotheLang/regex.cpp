@@ -58,6 +58,15 @@ struct SRegexChar : SRegex // tag = regexchr
 
 struct SParser
 {
+	SRegex * RegexFileParse()
+	{
+		SRegex * pRegex = RegexParse();
+
+		MatchChr(EOF);
+
+		return pRegex;
+	}
+	
 	SRegex * RegexParse()
 	{
 		MatchChr('(');

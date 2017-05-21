@@ -1,98 +1,79 @@
-Rule union
-	: concat (VBAR concat)*
+regexFile
+	: regex EOF
 	;
 
-Rule concat
-	: quantified (quantified)*
+regex
+	: '(' union ')'
 	;
 
-Rule quantified
-	: atom (STAR | PLUS | QMARK | count)*
+union
+	: concat ('|' concat)*
 	;
 
-Rule count
-	: LBRACE int? (COMMA int)? RBRACE
+concat
+	: quant (quant)*
 	;
 
+quant
+	: atom ('*' | '+' | '?' | count)?
+	;
 
-// hmmmmm
+count
+	: '[' int ']'
+	| '[' int ',' int ']'
+	| '[' ',' int ']'
+	;
+
 int
-	: DIGIT+
+	: [0-9]+
 	;
 
-
-Rule atom
-	: regexLiteral
-	| charSet
+atom
+	: regex
+	| set
+	| '.'
+	| escapedChr
+	| [^.\\()|*+?{}\[\]\cA-\cZ]
 	;
 
-Rule charSet
-	: LBRACK CARROT? (range)+ RBRACK
-	| DOT
-	| escapecharset
-	| regexChar
+escapedChr
+	: '\\'
+		( 'a'
+		| 'b'
+		| 'e'
+		| 'f'
+		| 'n'
+		| 'r'
+		| 't'
+		| 'v'
+		| 'c' [a-zA-z]
+		| 'x' [0-9a-fA-f]{2}
+		| [0-9]{1,3}
+		| '.'
+		| '\\'
+		| '('
+		| ')'
+		| '|'
+		| '*'
+		| '+'
+		| '?'
+		| '{'
+		| '}'
+		| '['
+		| ']'
+		)
 	;
 
-Rule range
-	: rangeChar (DASH rangeChar)?
-	| escapecharset
+set
+	: '[' '^'? range+ ']'
 	;
 
-escapecharset
-	: ESCAPEDIGITSET
-	| ESCAPENOTDIGITSET
-	| ESCAPEWHITESPACE
-	| ESCAPENOTWHITESPACE
-	| ESCAPEWORD
-	| ESCAPENOTWORD
+range
+	: setChr ('-' setChr)?
 	;
 
-rangeChar
-	: RANGECHAR
-	| DOLLAR
-	| escapedRangeChar
-	;
-
-escapedRangeChar
-	: ESCAPECONTROL
-	| ESCAPEFEED
-	| ESCAPENEWLINE
-	| ESCAPERETURN
-	| ESCAPEBACKSPACE
-	| ESCAPETAB
-	| ESCAPEVTAB
-	| ESCAPEBELL
-	| ESCAPEDOLLAR
-	| ESCAPELBRACK
-	| ESCAPERBRACK
-	| ESCAPESCAPE
-	| ESCAPEHEX
-	;
-
-regexChar
-	: REGEXCHAR
-	| DOLLAR
-	| escapedRangeChar
-	| escapedRegexChar
-	;
-
-escapedRegexChar
-	: escapedRangeChar
-	| ESCAPELPAREN
-	| ESCAPERPAREN
-	| ESCAPEVBAR
-	| ESCAPESTAR
-	| ESCAPEPLUS
-	| ESCAPEQMARK
-	| ESCAPELBRACE
-	| ESCAPERBRACE
-	| ESCAPEDOT
-	;
-
-REGEXCHAR
-	: [^()|*+?{}\[\]\\.\t\r\n\f\b\v\\cA-\cZ\a\$]
-	;
-
-RANGECHAR
-	: []\
+setChr
+	: [^\[\]\-\cA-\cZ\\]
+	| '\\' '-'
+	| escapedChr
 	;
