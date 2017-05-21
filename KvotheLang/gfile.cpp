@@ -738,7 +738,7 @@ struct SParser
 	STokenizer m_tokenizer;
 };
 
-int main()
+int local_main()
 {
 	const char * pChzFileName = "gfile.gfile";
 

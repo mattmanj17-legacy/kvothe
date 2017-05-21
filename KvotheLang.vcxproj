@@ -20,12 +20,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="KvotheLang\gfile.cpp" />
+    <ClCompile Include="KvotheLang\regex.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="KvotheLang\macros.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="KvotheLang\example.regex" />
     <None Include="KvotheLang\gfile.gfile" />
+    <None Include="KvotheLang\regex.gfile" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

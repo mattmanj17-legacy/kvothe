@@ -21,6 +21,9 @@
     <ClCompile Include="KvotheLang\gfile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="KvotheLang\regex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="KvotheLang\macros.h">
@@ -29,6 +32,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="KvotheLang\gfile.gfile">
+      <Filter>grammars</Filter>
+    </None>
+    <None Include="KvotheLang\regex.gfile">
+      <Filter>grammars</Filter>
+    </None>
+    <None Include="KvotheLang\example.regex">
       <Filter>grammars</Filter>
     </None>
   </ItemGroup>

@@ -1,0 +1,98 @@
+Rule union
+	: concat (VBAR concat)*
+	;
+
+Rule concat
+	: quantified (quantified)*
+	;
+
+Rule quantified
+	: atom (STAR | PLUS | QMARK | count)*
+	;
+
+Rule count
+	: LBRACE int? (COMMA int)? RBRACE
+	;
+
+
+// hmmmmm
+int
+	: DIGIT+
+	;
+
+
+Rule atom
+	: regexLiteral
+	| charSet
+	;
+
+Rule charSet
+	: LBRACK CARROT? (range)+ RBRACK
+	| DOT
+	| escapecharset
+	| regexChar
+	;
+
+Rule range
+	: rangeChar (DASH rangeChar)?
+	| escapecharset
+	;
+
+escapecharset
+	: ESCAPEDIGITSET
+	| ESCAPENOTDIGITSET
+	| ESCAPEWHITESPACE
+	| ESCAPENOTWHITESPACE
+	| ESCAPEWORD
+	| ESCAPENOTWORD
+	;
+
+rangeChar
+	: RANGECHAR
+	| DOLLAR
+	| escapedRangeChar
+	;
+
+escapedRangeChar
+	: ESCAPECONTROL
+	| ESCAPEFEED
+	| ESCAPENEWLINE
+	| ESCAPERETURN
+	| ESCAPEBACKSPACE
+	| ESCAPETAB
+	| ESCAPEVTAB
+	| ESCAPEBELL
+	| ESCAPEDOLLAR
+	| ESCAPELBRACK
+	| ESCAPERBRACK
+	| ESCAPESCAPE
+	| ESCAPEHEX
+	;
+
+regexChar
+	: REGEXCHAR
+	| DOLLAR
+	| escapedRangeChar
+	| escapedRegexChar
+	;
+
+escapedRegexChar
+	: escapedRangeChar
+	| ESCAPELPAREN
+	| ESCAPERPAREN
+	| ESCAPEVBAR
+	| ESCAPESTAR
+	| ESCAPEPLUS
+	| ESCAPEQMARK
+	| ESCAPELBRACE
+	| ESCAPERBRACE
+	| ESCAPEDOT
+	;
+
+REGEXCHAR
+	: [^()|*+?{}\[\]\\.\t\r\n\f\b\v\\cA-\cZ\a\$]
+	;
+
+RANGECHAR
+	: []\
+	;
