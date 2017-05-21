@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <vector>
 #include <string>
+#include <stdio.h>
 
 using std::vector;
 using std::string;
@@ -10,13 +11,16 @@ using std::string;
 
 struct SRegex // tag = regex
 {
+	virtual void PrintDebug() = 0;
+
+	virtual ~SRegex() {};
 };
 
 struct SRegexList : public SRegex // tag = regexlist
 {
 	vector<SRegex *> m_arypRegex;
 
-	~SRegexList()
+	~SRegexList() override
 	{
 		for(SRegex * pRegex : m_arypRegex)
 		{
@@ -27,10 +31,33 @@ struct SRegexList : public SRegex // tag = regexlist
 
 struct SUnion : public SRegexList // tag = union
 {
+	void PrintDebug() override
+	{
+		printf("(UNION ");
+
+		for(SRegex * pRegex : m_arypRegex)
+		{
+			pRegex->PrintDebug();
+		}
+
+		printf(")");
+	}
 };
 
 struct SConcatination : public SRegexList // tag = concat
 {
+	void PrintDebug() override
+	{
+		printf("(CONCAT");
+
+		for(SRegex * pRegex : m_arypRegex)
+		{
+			printf(" ");
+			pRegex->PrintDebug();
+		}
+
+		printf(")");
+	}
 };
 
 struct SQuantifier : public SRegex // tag = quant
@@ -39,9 +66,18 @@ struct SQuantifier : public SRegex // tag = quant
 	int m_cMac;
 	SRegex * m_pRegex;
 
-	~SQuantifier()
+	~SQuantifier() override
 	{
 		delete m_pRegex;
+	}
+
+	void PrintDebug() override
+	{
+		printf("({%d, %d} ", m_cMic, m_cMac);
+
+		m_pRegex->PrintDebug();
+
+		printf(")");
 	}
 };
 
@@ -49,11 +85,21 @@ struct SRange : SRegex // tag = range
 {
 	unsigned char m_chrMic;
 	unsigned char m_chrMac;
+
+	void PrintDebug() override
+	{
+		printf("('%c' - '%c')", m_chrMic, m_chrMac);
+	}
 };
 
 struct SRegexChar : SRegex // tag = regexchr
 {
 	unsigned char m_chr;
+
+	void PrintDebug() override
+	{
+		printf("'%c'", m_chr);
+	}
 };
 
 struct SParser
@@ -62,7 +108,7 @@ struct SParser
 	{
 		SRegex * pRegex = RegexParse();
 
-		MatchChr(EOF);
+		assert(fgetc(m_pFile) == EOF);
 
 		return pRegex;
 	}
@@ -329,7 +375,7 @@ struct SParser
 				ChrCur() == ']'
 			);
 
-			return ChrConsume();
+			return chrEscape;
 		}
 	}
 
@@ -441,24 +487,24 @@ struct SParser
 
 		SUnion * pUnion = new SUnion();
 		
-		for(unsigned char chr = 0; chr < 256; ++chr)
+		for(int iChr = 0; iChr < 256; ++iChr)
 		{
-			if(mpChrFIncluded[chr])
+			if(mpChrFIncluded[iChr])
 			{
 				// save the current chr, which is the begining or a range
 
-				unsigned char chrBegin = chr;
+				unsigned char chrBegin = iChr;
 
 				// advance to the end of the range
 				
-				while(mpChrFIncluded[chr + 1] && chr + 1 < 256)
+				while(mpChrFIncluded[iChr + 1] && iChr + 1 < 256)
 				{
-					++chr;
+					++iChr;
 				}
 				
 				// add either a signle chr or or range to the union
 				
-				if(chrBegin == chr)
+				if(chrBegin == iChr)
 				{
 					SRegexChar * pRegexchar = new SRegexChar();
 					pRegexchar->m_chr = chrBegin;
@@ -468,7 +514,7 @@ struct SParser
 				{
 					SRange * pRange = new SRange();
 					pRange->m_chrMic = chrBegin;
-					pRange->m_chrMac = chr;
+					pRange->m_chrMac = iChr;
 					pUnion->m_arypRegex.push_back(pRange);
 				}
 			}
@@ -514,5 +560,19 @@ struct SParser
 
 int main()
 {
+	const char * pChzFileName = "example.regex";
+
+	FILE * pFile = fopen(pChzFileName, "r");
+
+	SParser parser;
+
+	parser.SetInput(pFile);
+
+	SRegex * pRegex = parser.RegexFileParse();
+
+	pRegex->PrintDebug();
+
+	delete pRegex;
+
 	return 0;
 }
