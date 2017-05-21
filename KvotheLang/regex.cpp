@@ -226,28 +226,29 @@ struct SParser
 
 	SRegex * QuantParse()
 	{
-		SRegex * pRegexAtom = AtomParse();
-
-		// if this is a quant (has a quantifier after the atom), create a quant with the right cMic and cMac and return it
-		
-		if(
+		SRegex * pRegexCur = AtomParse();
+			
+		while(
 			ChrCur() == '*' ||
 			ChrCur() == '+' ||
 			ChrCur() == '?' ||
 			ChrCur() == '{' 
 		)
 		{
-			SQuantifier * pQuant = new SQuantifier();
-			pQuant->m_pRegex = pRegexAtom;
+			// while there is a chr that begins a quantification, 
+			// make a new quantifier quantifieing the regex to the left
 			
+			SQuantifier * pQuant = new SQuantifier();
+			pQuant->m_pRegex = pRegexCur;
+
 			ParseInitQuant(pQuant);
 
-			return pQuant;
+			pRegexCur = pQuant;
 		}
-		
-		// otherwise, just return the atom we parsed
 
-		return pRegexAtom;
+		// return the quantified regex (either the original atom, or nested quantifiers ending with the atom)
+
+		return pRegexCur;
 	}
 
 	unsigned char ChrConsumeHex()

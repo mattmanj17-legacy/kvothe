@@ -15,7 +15,7 @@ concat
 	;
 
 quant
-	: atom ('*' | '+' | '?' | count)?
+	: atom ('*' | '+' | '?' | count)*
 	;
 
 count
