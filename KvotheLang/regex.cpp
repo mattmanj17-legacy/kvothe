@@ -4,9 +4,11 @@
 #include <string>
 #include <stdio.h>
 #include <assert.h>
+#include <queue>
 
 using std::vector;
 using std::string;
+using std::queue;
 
 template<typename T>
 struct Pool
@@ -33,6 +35,14 @@ struct Pool
 	vector<T*> m_aryp;
 };
 
+struct SNfaState;
+
+struct SNfaTransition
+{
+	SNfaState * m_pStateNext;
+	char m_chr;
+};
+
 struct SNfaState
 {
 	friend class SNfaState;
@@ -44,6 +54,12 @@ struct SNfaState
 
 	virtual vector<SNfaState*> AryPStateEpsilonClosure()
 							{ return vector<SNfaState*> { this }; }
+
+	virtual vector<SNfaState*> AryPStateEpsilon()
+								{ return vector<SNfaState*>(); }
+
+	virtual vector<SNfaTransition> AryTran()
+	{ return vector<SNfaState*>();}
 protected:
 	bool m_fPatched = false;
 	vector<SNfaState*> m_aryPStateFrontier;
@@ -90,7 +106,35 @@ struct SNfaOrState : public SNfaState
 
 	vector<SNfaState*> AryPStateEpsilonClosure() override
 	{
-		// !!
+		vector<SNfaState*> aryPStateEpsilonClosure;
+		queue<SNfaState*> qPState;
+
+		qPState.push(this);
+
+		while(qPState.size() > 0)
+		{
+			SNfaState* pStateCur = qPState.front();
+			qPState.pop();
+
+			if(std::find(aryPStateEpsilonClosure.begin(), aryPStateEpsilonClosure.end(), pStateCur) != aryPStateEpsilonClosure.end())
+			{
+				continue;
+			}
+			
+			aryPStateEpsilonClosure.push_back(pStateCur);
+
+			for(SNfaState * pState : pStateCur->AryPStateEpsilon())
+			{
+				qPState.push(pState);
+			}
+		}
+
+		return aryPStateEpsilonClosure;
+	}
+
+	vector<SNfaState*> AryPStateEpsilon() override
+	{
+		return m_aryPState;
 	}
 
 protected:
