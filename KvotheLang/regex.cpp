@@ -35,108 +35,118 @@ struct Pool
 
 struct State;
 
-struct StateTransitions
-{
-	State* m_mpChrState [256] = { nullptr };
-	vector<State*> m_arypStateEpsilon;
-};
-
 struct State
 {
-	void Patch(State * pState)
-	{
-		if(m_fPatched)
-			return;
+	friend class State;
+	friend class OrState;
+	friend class MatchState;
+	
+	virtual void Patch(State * pState) 
+					{ m_fPatched = true; }
 
-		m_fPatched = true;
-
-		PatchImpl(pState);
-	}
-
-	virtual void PatchImpl(State * pState) = 0;
-
-	StateTransitions * PStateTransitions()
-	{
-		if(!m_statetransitions)
-		{
-			m_statetransitions = m_fAccepting ? new StateTransitions() : PStateTransitionsImpl();
-		}
-
-		return m_statetransitions;
-	}
-
-	virtual StateTransitions * PStateTransitionsImpl() = 0;
-
-	~State()
-	{
-		if(m_statetransitions)
-			delete m_statetransitions;
-	}
-
-	StateTransitions * m_statetransitions = nullptr;
-
+	virtual vector<State*> AryPStateEpsilonClosure()
+							{ return vector<State*> { this }; }
+protected:
 	bool m_fPatched = false;
-	bool m_fAccepting = false;
+	vector<State*> m_aryPStateFrontier;
 };
 
 Pool<State> m_poolState;
 
-struct OrState : State
+struct OrState : public State
 {
-	State * m_pState1 = nullptr;
-	State * m_pState2 = nullptr;
-	
-	void PatchImpl(State * pState) override
+	void AddAlt(State* pState)
 	{
-		assert(pState);
+		assert(!m_fPatched);
 		
-		if(m_pState1) m_pState1->Patch(pState); else m_pState1 = pState;
-		if(m_pState2) m_pState2->Patch(pState); else m_pState2 = pState;
+		m_aryPState.push_back(pState);
+
+		if(pState)
+		{
+			m_aryPStateFrontier.insert(m_aryPStateFrontier.end(), pState->m_aryPStateFrontier.begin(), pState->m_aryPStateFrontier.begin());
+			pState->m_aryPStateFrontier.clear();
+		}
 	}
 
-	StateTransitions * PStateTransitionsImpl() override
+	void Patch(State * pStatePatch) override
 	{
-		assert(m_pState1);
-		assert(m_pState2);
+		State::Patch(pStatePatch);
 		
-		StateTransitions * pSt = new StateTransitions();
+		for(State * pState : m_aryPStateFrontier)
+		{
+			pState->Patch(pStatePatch);
+		}
 
-		pSt->m_arypStateEpsilon.push_back(m_pState1);
-		pSt->m_arypStateEpsilon.push_back(m_pState2);
+		for(int iPState = 0; iPState < m_aryPState.size(); ++iPState)
+		{
+			if(m_aryPState[iPState] == nullptr)
+			{
+				m_aryPState[iPState] = pStatePatch;
+			}
+		}
 
-		return pSt;
+		m_aryPStateFrontier.clear();
+		m_aryPStateFrontier.insert(m_aryPStateFrontier.end(), pStatePatch->m_aryPStateFrontier.begin(), pStatePatch->m_aryPStateFrontier.begin());
+		pStatePatch->m_aryPStateFrontier.clear();
 	}
+
+	vector<State*> AryPStateEpsilonClosure() override
+	{
+		// !!
+	}
+
+protected:
+	vector<State *> m_aryPState;
 };
 
 struct MatchState : State
 {
-	State * m_pStateNext = nullptr;
 	unsigned char m_chr;
 
-	void PatchImpl(State * pState) override
+	MatchState()
 	{
-		assert(pState != nullptr);
+		m_aryPStateFrontier.push_back(this);
+	}
+
+	void SetNextState(State* pState)
+	{
+		assert(!m_fPatched);
+		assert(!m_pStateNext);
+		assert(pState);
 		
-		if(m_pStateNext)
+		m_pStateNext = pState;
+
+		m_aryPStateFrontier.clear();
+		m_aryPStateFrontier.insert(m_aryPStateFrontier.end(), pState->m_aryPStateFrontier.begin(), pState->m_aryPStateFrontier.begin());
+		pState->m_aryPStateFrontier.clear();
+	}
+
+	void Patch(State * pStatePatch) override
+	{
+		State::Patch(pStatePatch);
+		
+		assert(pStatePatch);
+
+		if(!m_pStateNext)
 		{
-			m_pStateNext->Patch(pState);
+			m_pStateNext = pStatePatch;
 		}
 		else
 		{
-			m_pStateNext = pState;
+			for(State * pState : m_aryPStateFrontier)
+			{
+				pState->Patch(pStatePatch);
+			}
 		}
+
+		m_aryPStateFrontier.clear();
+		m_aryPStateFrontier.insert(m_aryPStateFrontier.end(), pStatePatch->m_aryPStateFrontier.begin(), pStatePatch->m_aryPStateFrontier.begin());
+		pStatePatch->m_aryPStateFrontier.clear();
 	}
 
-	StateTransitions * PStateTransitionsImpl() override
-	{
-		assert(m_pStateNext);
-		
-		StateTransitions * pSt = new StateTransitions();
+protected:
 
-		pSt->m_mpChrState[m_chr] = m_pStateNext;
-
-		return pSt;
-	}
+	State * m_pStateNext = nullptr;
 };
 
 struct SRegex // tag = regex
@@ -167,27 +177,18 @@ struct SUnion : public SRegexList // tag = union
 		printf(")");
 	}
 
-	State * PStateCreateImpl(unsigned int iMic)
-	{
-		assert(iMic >= 0 && iMic < m_arypRegex.size());
-
-		if(iMic == m_arypRegex.size() - 1)
-			return m_arypRegex[iMic]->PStateCreate();
-
-		OrState * pOrState = m_poolState.PCreate<OrState>();
-
-		pOrState->m_pState1 = m_arypRegex[iMic]->PStateCreate();
-
-		pOrState->m_pState2 = PStateCreateImpl(iMic + 1);
-
-		return pOrState;
-	}
-
 	State * PStateCreate() override
 	{
 		assert(m_arypRegex.size() > 0);
 
-		return PStateCreateImpl(0);
+		OrState * pOrState = m_poolState.PCreate<OrState>();
+
+		for(SRegex * pRegex : m_arypRegex)
+		{
+			pOrState->AddAlt(pRegex->PStateCreate());
+		}
+
+		return pOrState;
 	}
 };
 
@@ -206,25 +207,18 @@ struct SConcatination : public SRegexList // tag = concat
 		printf(")");
 	}
 
-	State * PStateCreateImpl(unsigned int iMic)
-	{
-		assert(iMic >= 0 && iMic < m_arypRegex.size());
-
-		if(iMic == m_arypRegex.size() - 1)
-			return m_arypRegex[iMic]->PStateCreate();
-		
-		State * pStateStart = m_arypRegex[iMic]->PStateCreate();
-
-		pStateStart->Patch(PStateCreateImpl(iMic + 1));
-
-		return pStateStart;
-	}
-
 	State * PStateCreate() override
 	{
 		assert(m_arypRegex.size() > 0);
 
-		return PStateCreateImpl(0);
+		State * pStateStart = m_arypRegex[0]->PStateCreate();
+
+		for(int i = 1; i < m_arypRegex.size(); ++i)
+		{
+			pStateStart->Patch(m_arypRegex[i]->PStateCreate());
+		}
+
+		return pStateStart;
 	}
 };
 
@@ -254,8 +248,6 @@ struct SQuantifier : public SRegex // tag = quant
 
 		State * pState = concat.PStateCreate();
 
-		concat.m_arypRegex.clear();
-
 		return pState;
 	}
 
@@ -265,6 +257,8 @@ struct SQuantifier : public SRegex // tag = quant
 
 		State * pStateQMark = PStateCreateQMark(&pState);
 
+		// loop pState back to the or State to turn the ? into a *
+
 		pState->Patch(pStateQMark);
 
 		return pStateQMark;
@@ -272,11 +266,13 @@ struct SQuantifier : public SRegex // tag = quant
 
 	State * PStateCreateQMark(State ** ppState = nullptr)
 	{
-		OrState * pState = m_poolState.PCreate<OrState>();
-		pState->m_pState1 = m_pRegex->PStateCreate();
+		OrState * pOrState = m_poolState.PCreate<OrState>();
+		State * pState = m_pRegex->PStateCreate();
+		pOrState->AddAlt(pState);
+		pOrState->AddAlt(nullptr);
 
 		if(ppState)
-			(*ppState) = pState->m_pState1;
+			(*ppState) = pState;
 
 		return pState;
 	}
@@ -349,35 +345,19 @@ struct SRange : SRegex // tag = range
 		printf("('%c' - '%c')", m_chrMic, m_chrMac);
 	}
 
-	OrState * PStateCreateImpl(unsigned char chrMic, unsigned char chrMac)
+	State * PStateCreate() override
 	{
-		assert(chrMic < chrMac);
-
 		OrState * pOrState = m_poolState.PCreate<OrState>();
 
-		MatchState * pMatch = m_poolState.PCreate<MatchState>();
-		pMatch->m_chr = chrMic;
-
-		pOrState->m_pState1 = pMatch;
-
-		if(chrMac == chrMic + 1)
+		for(int iChr = m_chrMic; iChr <= m_chrMac; ++iChr)
 		{
-			pMatch = m_poolState.PCreate<MatchState>();
-			pMatch->m_chr = chrMac;
+			MatchState * pMatch = m_poolState.PCreate<MatchState>();
+			pMatch->m_chr = iChr;
 
-			pOrState->m_pState2 = pMatch;
-		}
-		else
-		{
-			pOrState->m_pState2 = PStateCreateImpl(chrMic + 1, chrMac);
+			pOrState->AddAlt(pOrState);
 		}
 
 		return pOrState;
-	}
-
-	State * PStateCreate() override
-	{
-		return PStateCreateImpl(m_chrMic, m_chrMac);
 	}
 };
 
@@ -872,13 +852,6 @@ int main()
 	pRegex->PrintDebug();
 
 	State * pState = pRegex->PStateCreate();
-
-	MatchState * pMatch = m_poolState.PCreate<MatchState>();
-	pMatch->m_fAccepting = true;
-
-	pState->Patch(pMatch);
-
-	vector<StateTransitions *> arypTran;
 
 	m_poolRegex.Clear();
 	m_poolState.Clear();
