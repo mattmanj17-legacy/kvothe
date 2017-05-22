@@ -39,12 +39,47 @@ struct SNfaState;
 
 struct SNfaTransition
 {
-	SNfaState * m_pStateNext;
+	SNfaState * m_pStateNext = nullptr;
 	char m_chr;
 };
 
 struct SNfaState
 {
+	static int idNext;
+	int m_id;
+	
+	SNfaState()
+	{
+		m_id = idNext++;
+	}
+
+	void PrintDebug()
+	{
+		printf("\n");
+		printf("state %d:\n", m_id);
+		
+		if(m_aryTran.size() > 0)
+		{
+			printf("transitions:");
+			for(SNfaTransition tran : m_aryTran)
+			{
+				printf(" ");
+				printf("'%c' -> %d", tran.m_chr, tran.m_pStateNext->m_id);
+			}
+			printf("\n");
+		}
+
+		if(m_aryPStateEpsilon.size() > 0)
+		{
+			printf("epsilon:");
+			for(SNfaState * pState : m_aryPStateEpsilon)
+			{
+				printf(" %d", pState ? pState->m_id : -2);
+			}
+			printf("\n");
+		}
+	}
+	
 	void Patch(SNfaState * pState) 
 	{ 
 		if(m_fPatching)
@@ -98,6 +133,7 @@ protected:
 	vector<SNfaState*> m_aryPStateEpsilon;
 	vector<SNfaTransition> m_aryTran;
 };
+int SNfaState::idNext = 0;
 
 Pool<SNfaState> m_poolState;
 
@@ -105,7 +141,7 @@ struct SRegex // tag = regex
 {
 	virtual void PrintDebug() = 0;
 
-	virtual ~SRegex() {};
+	virtual ~SRegex(){};
 
 	virtual SNfaState * PStateCreate() = 0;
 };
@@ -133,11 +169,11 @@ struct SUnion : public SRegexList // tag = union
 	{
 		assert(m_arypRegex.size() > 0);
 
-		SNfaOrState * pOrState = m_poolState.PCreate<SNfaOrState>();
+		SNfaState * pOrState = m_poolState.PCreate<SNfaState>();
 
 		for(SRegex * pRegex : m_arypRegex)
 		{
-			pOrState->AddAlt(pRegex->PStateCreate());
+			pOrState->AddEpsilon(pRegex->PStateCreate());
 		}
 
 		return pOrState;
@@ -209,7 +245,7 @@ struct SQuantifier : public SRegex // tag = quant
 
 		SNfaState * pStateQMark = PStateCreateQMark(&pState);
 
-		// loop pState back to the or State to turn the ? into a *
+		// loop pState back to the orState to turn the ? into a *
 
 		pState->Patch(pStateQMark);
 
@@ -218,10 +254,10 @@ struct SQuantifier : public SRegex // tag = quant
 
 	SNfaState * PStateCreateQMark(SNfaState ** ppState = nullptr)
 	{
-		SNfaOrState * pOrState = m_poolState.PCreate<SNfaOrState>();
+		SNfaState * pOrState = m_poolState.PCreate<SNfaState>();
 		SNfaState * pState = m_pRegex->PStateCreate();
-		pOrState->AddAlt(pState);
-		pOrState->AddAlt(nullptr);
+		pOrState->AddEpsilon(pState);
+		pOrState->AddEpsilon(nullptr);
 
 		if(ppState)
 			(*ppState) = pState;
@@ -299,14 +335,14 @@ struct SRange : SRegex // tag = range
 
 	SNfaState * PStateCreate() override
 	{
-		SNfaOrState * pOrState = m_poolState.PCreate<SNfaOrState>();
+		SNfaState * pOrState = m_poolState.PCreate<SNfaState>();
 
 		for(int iChr = m_chrMic; iChr <= m_chrMac; ++iChr)
 		{
-			SNfaMatchState * pMatch = m_poolState.PCreate<SNfaMatchState>();
-			pMatch->m_chr = iChr;
+			SNfaState * pMatchState = m_poolState.PCreate<SNfaState>();
+			pMatchState->AddTransition(iChr, nullptr);
 
-			pOrState->AddAlt(pOrState);
+			pOrState->AddEpsilon(pMatchState);
 		}
 
 		return pOrState;
@@ -324,10 +360,10 @@ struct SRegexChar : SRegex // tag = regexchr
 
 	SNfaState * PStateCreate() override
 	{
-		SNfaMatchState * pMatch = m_poolState.PCreate<SNfaMatchState>();
-		pMatch->m_chr = m_chr;
+		SNfaState * pMatchState = m_poolState.PCreate<SNfaState>();
+		pMatchState->AddTransition(m_chr, nullptr);
 
-		return pMatch;
+		return pMatchState;
 	}
 };
 
@@ -804,6 +840,16 @@ int main()
 	pRegex->PrintDebug();
 
 	SNfaState * pState = pRegex->PStateCreate();
+
+	SNfaState stateAccept;
+	stateAccept.m_id = -1;
+
+	pState->Patch(&stateAccept);
+
+	for(SNfaState* pState : m_poolState.m_aryp)
+	{
+		pState->PrintDebug();
+	}
 
 	m_poolRegex.Clear();
 	m_poolState.Clear();
