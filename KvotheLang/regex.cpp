@@ -45,151 +45,61 @@ struct SNfaTransition
 
 struct SNfaState
 {
-	friend class SNfaState;
-	friend class SNfaOrState;
-	friend class SNfaMatchState;
-	
-	virtual void Patch(SNfaState * pState) 
-					{ m_fPatched = true; }
+	void Patch(SNfaState * pState) 
+	{ 
+		if(m_fPatching)
+			return;
+		
+		m_fPatching = true;
 
-	virtual vector<SNfaState*> AryPStateEpsilonClosure()
-							{ return vector<SNfaState*> { this }; }
+		for(int iEpsilon = 0; iEpsilon < m_aryPStateEpsilon.size(); ++iEpsilon)
+		{
+			if(!m_aryPStateEpsilon[iEpsilon])
+			{
+				m_aryPStateEpsilon[iEpsilon] = pState;
+			}
+			else
+			{
+				m_aryPStateEpsilon[iEpsilon]->Patch(pState);
+			}
+		}
 
-	virtual vector<SNfaState*> AryPStateEpsilon()
-								{ return vector<SNfaState*>(); }
+		for(int iTran = 0; iTran < m_aryTran.size(); ++iTran)
+		{
+			if(!m_aryTran[iTran].m_pStateNext)
+			{
+				m_aryTran[iTran].m_pStateNext = pState;
+			}
+			else
+			{
+				m_aryTran[iTran].m_pStateNext->Patch(pState);
+			}
+		}
 
-	virtual vector<SNfaTransition> AryTran()
-	{ return vector<SNfaState*>();}
+		m_fPatching = false;
+	}
+
+	vector<SNfaState*> AryPStateEpsilonClosure()
+	{
+	}
+
+	void AddTransition(char chr, SNfaState * pStateNext)
+	{
+		m_aryTran.push_back({pStateNext, chr});
+	}
+
+	void AddEpsilon(SNfaState * pStateNext)
+	{
+		m_aryPStateEpsilon.push_back(pStateNext);
+	}
+
 protected:
-	bool m_fPatched = false;
-	vector<SNfaState*> m_aryPStateFrontier;
+	bool m_fPatching = false;
+	vector<SNfaState*> m_aryPStateEpsilon;
+	vector<SNfaTransition> m_aryTran;
 };
 
 Pool<SNfaState> m_poolState;
-
-struct SNfaOrState : public SNfaState
-{
-	void AddAlt(SNfaState* pState)
-	{
-		assert(!m_fPatched);
-		
-		m_aryPState.push_back(pState);
-
-		if(pState)
-		{
-			m_aryPStateFrontier.insert(m_aryPStateFrontier.end(), pState->m_aryPStateFrontier.begin(), pState->m_aryPStateFrontier.begin());
-			pState->m_aryPStateFrontier.clear();
-		}
-	}
-
-	void Patch(SNfaState * pStatePatch) override
-	{
-		SNfaState::Patch(pStatePatch);
-		
-		for(SNfaState * pState : m_aryPStateFrontier)
-		{
-			pState->Patch(pStatePatch);
-		}
-
-		for(int iPState = 0; iPState < m_aryPState.size(); ++iPState)
-		{
-			if(m_aryPState[iPState] == nullptr)
-			{
-				m_aryPState[iPState] = pStatePatch;
-			}
-		}
-
-		m_aryPStateFrontier.clear();
-		m_aryPStateFrontier.insert(m_aryPStateFrontier.end(), pStatePatch->m_aryPStateFrontier.begin(), pStatePatch->m_aryPStateFrontier.begin());
-		pStatePatch->m_aryPStateFrontier.clear();
-	}
-
-	vector<SNfaState*> AryPStateEpsilonClosure() override
-	{
-		vector<SNfaState*> aryPStateEpsilonClosure;
-		queue<SNfaState*> qPState;
-
-		qPState.push(this);
-
-		while(qPState.size() > 0)
-		{
-			SNfaState* pStateCur = qPState.front();
-			qPState.pop();
-
-			if(std::find(aryPStateEpsilonClosure.begin(), aryPStateEpsilonClosure.end(), pStateCur) != aryPStateEpsilonClosure.end())
-			{
-				continue;
-			}
-			
-			aryPStateEpsilonClosure.push_back(pStateCur);
-
-			for(SNfaState * pState : pStateCur->AryPStateEpsilon())
-			{
-				qPState.push(pState);
-			}
-		}
-
-		return aryPStateEpsilonClosure;
-	}
-
-	vector<SNfaState*> AryPStateEpsilon() override
-	{
-		return m_aryPState;
-	}
-
-protected:
-	vector<SNfaState *> m_aryPState;
-};
-
-struct SNfaMatchState : SNfaState
-{
-	unsigned char m_chr;
-
-	SNfaMatchState()
-	{
-		m_aryPStateFrontier.push_back(this);
-	}
-
-	void SetNextState(SNfaState* pState)
-	{
-		assert(!m_fPatched);
-		assert(!m_pStateNext);
-		assert(pState);
-		
-		m_pStateNext = pState;
-
-		m_aryPStateFrontier.clear();
-		m_aryPStateFrontier.insert(m_aryPStateFrontier.end(), pState->m_aryPStateFrontier.begin(), pState->m_aryPStateFrontier.begin());
-		pState->m_aryPStateFrontier.clear();
-	}
-
-	void Patch(SNfaState * pStatePatch) override
-	{
-		SNfaState::Patch(pStatePatch);
-		
-		assert(pStatePatch);
-
-		if(!m_pStateNext)
-		{
-			m_pStateNext = pStatePatch;
-		}
-		else
-		{
-			for(SNfaState * pState : m_aryPStateFrontier)
-			{
-				pState->Patch(pStatePatch);
-			}
-		}
-
-		m_aryPStateFrontier.clear();
-		m_aryPStateFrontier.insert(m_aryPStateFrontier.end(), pStatePatch->m_aryPStateFrontier.begin(), pStatePatch->m_aryPStateFrontier.begin());
-		pStatePatch->m_aryPStateFrontier.clear();
-	}
-
-protected:
-
-	SNfaState * m_pStateNext = nullptr;
-};
 
 struct SRegex // tag = regex
 {
