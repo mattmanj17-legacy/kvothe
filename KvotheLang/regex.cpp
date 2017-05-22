@@ -8,24 +8,149 @@
 using std::vector;
 using std::string;
 
+template<typename T>
+struct Pool
+{
+	template<typename TDerived>
+	TDerived* PCreate()
+	{
+		TDerived* p = new TDerived();
+		m_aryp.push_back(p);
+
+		return p;
+	}
+
+	void Clear()
+	{
+		for(T* p : m_aryp)
+		{
+			delete p;
+		}
+
+		m_aryp.clear();
+	}
+	
+	vector<T*> m_aryp;
+};
+
+struct State;
+
+struct StateTransitions
+{
+	State* m_mpChrState [256] = { nullptr };
+	vector<State*> m_arypStateEpsilon;
+};
+
+struct State
+{
+	void Patch(State * pState)
+	{
+		if(m_fPatched)
+			return;
+
+		m_fPatched = true;
+
+		PatchImpl(pState);
+	}
+
+	virtual void PatchImpl(State * pState) = 0;
+
+	StateTransitions * PStateTransitions()
+	{
+		if(!m_statetransitions)
+		{
+			m_statetransitions = m_fAccepting ? new StateTransitions() : PStateTransitionsImpl();
+		}
+
+		return m_statetransitions;
+	}
+
+	virtual StateTransitions * PStateTransitionsImpl() = 0;
+
+	~State()
+	{
+		if(m_statetransitions)
+			delete m_statetransitions;
+	}
+
+	StateTransitions * m_statetransitions = nullptr;
+
+	bool m_fPatched = false;
+	bool m_fAccepting = false;
+};
+
+Pool<State> m_poolState;
+
+struct OrState : State
+{
+	State * m_pState1 = nullptr;
+	State * m_pState2 = nullptr;
+	
+	void PatchImpl(State * pState) override
+	{
+		assert(pState);
+		
+		if(m_pState1) m_pState1->Patch(pState); else m_pState1 = pState;
+		if(m_pState2) m_pState2->Patch(pState); else m_pState2 = pState;
+	}
+
+	StateTransitions * PStateTransitionsImpl() override
+	{
+		assert(m_pState1);
+		assert(m_pState2);
+		
+		StateTransitions * pSt = new StateTransitions();
+
+		pSt->m_arypStateEpsilon.push_back(m_pState1);
+		pSt->m_arypStateEpsilon.push_back(m_pState2);
+
+		return pSt;
+	}
+};
+
+struct MatchState : State
+{
+	State * m_pStateNext = nullptr;
+	unsigned char m_chr;
+
+	void PatchImpl(State * pState) override
+	{
+		assert(pState != nullptr);
+		
+		if(m_pStateNext)
+		{
+			m_pStateNext->Patch(pState);
+		}
+		else
+		{
+			m_pStateNext = pState;
+		}
+	}
+
+	StateTransitions * PStateTransitionsImpl() override
+	{
+		assert(m_pStateNext);
+		
+		StateTransitions * pSt = new StateTransitions();
+
+		pSt->m_mpChrState[m_chr] = m_pStateNext;
+
+		return pSt;
+	}
+};
+
 struct SRegex // tag = regex
 {
 	virtual void PrintDebug() = 0;
 
 	virtual ~SRegex() {};
+
+	virtual State * PStateCreate() = 0;
 };
 
 struct SRegexList : public SRegex // tag = regexlist
 {
 	vector<SRegex *> m_arypRegex;
-
-	~SRegexList() override
-	{
-		for(SRegex * pRegex : m_arypRegex)
-		{
-			delete pRegex;
-		}
-	}
 };
 
 struct SUnion : public SRegexList // tag = union
@@ -40,6 +165,29 @@ struct SUnion : public SRegexList // tag = union
 		}
 
 		printf(")");
+	}
+
+	State * PStateCreateImpl(unsigned int iMic)
+	{
+		assert(iMic >= 0 && iMic < m_arypRegex.size());
+
+		if(iMic == m_arypRegex.size() - 1)
+			return m_arypRegex[iMic]->PStateCreate();
+
+		OrState * pOrState = m_poolState.PCreate<OrState>();
+
+		pOrState->m_pState1 = m_arypRegex[iMic]->PStateCreate();
+
+		pOrState->m_pState2 = PStateCreateImpl(iMic + 1);
+
+		return pOrState;
+	}
+
+	State * PStateCreate() override
+	{
+		assert(m_arypRegex.size() > 0);
+
+		return PStateCreateImpl(0);
 	}
 };
 
@@ -57,6 +205,27 @@ struct SConcatination : public SRegexList // tag = concat
 
 		printf(")");
 	}
+
+	State * PStateCreateImpl(unsigned int iMic)
+	{
+		assert(iMic >= 0 && iMic < m_arypRegex.size());
+
+		if(iMic == m_arypRegex.size() - 1)
+			return m_arypRegex[iMic]->PStateCreate();
+		
+		State * pStateStart = m_arypRegex[iMic]->PStateCreate();
+
+		pStateStart->Patch(PStateCreateImpl(iMic + 1));
+
+		return pStateStart;
+	}
+
+	State * PStateCreate() override
+	{
+		assert(m_arypRegex.size() > 0);
+
+		return PStateCreateImpl(0);
+	}
 };
 
 struct SQuantifier : public SRegex // tag = quant
@@ -65,11 +234,6 @@ struct SQuantifier : public SRegex // tag = quant
 	int m_cMac;
 	SRegex * m_pRegex;
 
-	~SQuantifier() override
-	{
-		delete m_pRegex;
-	}
-
 	void PrintDebug() override
 	{
 		printf("({%d, %d} ", m_cMic, m_cMac);
@@ -77,6 +241,101 @@ struct SQuantifier : public SRegex // tag = quant
 		m_pRegex->PrintDebug();
 
 		printf(")");
+	}
+
+	State * PStateCreateCount(int c)
+	{
+		SConcatination concat;
+
+		for(int iC = 0; iC < c; ++ iC)
+		{
+			concat.m_arypRegex.push_back(m_pRegex);
+		}
+
+		State * pState = concat.PStateCreate();
+
+		concat.m_arypRegex.clear();
+
+		return pState;
+	}
+
+	State * PStateCreateStar()
+	{
+		State * pState;
+
+		State * pStateQMark = PStateCreateQMark(&pState);
+
+		pState->Patch(pStateQMark);
+
+		return pStateQMark;
+	}
+
+	State * PStateCreateQMark(State ** ppState = nullptr)
+	{
+		OrState * pState = m_poolState.PCreate<OrState>();
+		pState->m_pState1 = m_pRegex->PStateCreate();
+
+		if(ppState)
+			(*ppState) = pState->m_pState1;
+
+		return pState;
+	}
+
+	State * PStateCreateCountOptional(int c)
+	{
+		assert(c > 0);
+		
+		State * pState;
+
+		State * pStateQMark = PStateCreateQMark(&pState);
+
+		if(c > 1)
+		{
+			pState->Patch(PStateCreateCountOptional(c-1));
+		}
+
+		return pStateQMark;
+	}
+
+	State * PStateCreate() override
+	{
+		State * pState = nullptr;
+
+		if(m_cMic > 0)
+		{
+			pState = PStateCreateCount(m_cMic);
+		}
+
+		if(m_cMac == -1)
+		{
+			if(pState)
+			{
+				pState->Patch(PStateCreateStar());
+			}
+			else
+			{
+				pState = PStateCreateStar();
+			}
+
+			return pState;
+		}
+
+		if(m_cMac <= m_cMic)
+		{
+			assert(pState);
+			return pState;
+		}
+
+		if(pState)
+		{
+			pState->Patch(PStateCreateCountOptional(m_cMac - m_cMic));
+		}
+		else
+		{
+			pState = PStateCreateCountOptional(m_cMac - m_cMic);
+		}
+
+		return pState;
 	}
 };
 
@@ -89,6 +348,37 @@ struct SRange : SRegex // tag = range
 	{
 		printf("('%c' - '%c')", m_chrMic, m_chrMac);
 	}
+
+	OrState * PStateCreateImpl(unsigned char chrMic, unsigned char chrMac)
+	{
+		assert(chrMic < chrMac);
+
+		OrState * pOrState = m_poolState.PCreate<OrState>();
+
+		MatchState * pMatch = m_poolState.PCreate<MatchState>();
+		pMatch->m_chr = chrMic;
+
+		pOrState->m_pState1 = pMatch;
+
+		if(chrMac == chrMic + 1)
+		{
+			pMatch = m_poolState.PCreate<MatchState>();
+			pMatch->m_chr = chrMac;
+
+			pOrState->m_pState2 = pMatch;
+		}
+		else
+		{
+			pOrState->m_pState2 = PStateCreateImpl(chrMic + 1, chrMac);
+		}
+
+		return pOrState;
+	}
+
+	State * PStateCreate() override
+	{
+		return PStateCreateImpl(m_chrMic, m_chrMac);
+	}
 };
 
 struct SRegexChar : SRegex // tag = regexchr
@@ -99,7 +389,17 @@ struct SRegexChar : SRegex // tag = regexchr
 	{
 		printf("'%c'", m_chr);
 	}
+
+	State * PStateCreate() override
+	{
+		MatchState * pMatch = m_poolState.PCreate<MatchState>();
+		pMatch->m_chr = m_chr;
+
+		return pMatch;
+	}
 };
+
+Pool<SRegex> m_poolRegex;
 
 struct SParser
 {
@@ -131,7 +431,7 @@ struct SParser
 		
 		if(ChrCur() == '|')
 		{
-			SUnion * pUnion = new SUnion();
+			SUnion * pUnion = m_poolRegex.PCreate<SUnion>();
 			pUnion->m_arypRegex.push_back(pConcat);
 			
 			while(ChrCur() == '|')
@@ -170,7 +470,7 @@ struct SParser
 
 		if(FChrCanBeginAtom(ChrCur()))
 		{
-			SConcatination * pConcat = new SConcatination();
+			SConcatination * pConcat = m_poolRegex.PCreate<SConcatination>();
 			pConcat->m_arypRegex.push_back(pQuant);
 			
 			while(FChrCanBeginAtom(ChrCur()))
@@ -283,7 +583,7 @@ struct SParser
 			// while there is a chr that begins a quantification, 
 			// make a new quantifier quantifieing the regex to the left
 			
-			SQuantifier * pQuant = new SQuantifier();
+			SQuantifier * pQuant = m_poolRegex.PCreate<SQuantifier>();
 			pQuant->m_pRegex = pRegexCur;
 
 			ParseInitQuant(pQuant);
@@ -392,7 +692,7 @@ struct SParser
 		{
 			MatchChr('.');
 			
-			SRange * pRange = new SRange();
+			SRange * pRange = m_poolRegex.PCreate<SRange>();
 			pRange->m_chrMic = 0;
 			pRange->m_chrMac = 255;
 
@@ -402,7 +702,7 @@ struct SParser
 		{
 			MatchChr('\\');
 
-			SRegexChar * pRegexchar = new SRegexChar();
+			SRegexChar * pRegexchar = m_poolRegex.PCreate<SRegexChar>();
 			pRegexchar->m_chr = ChrEscaped();
 
 			return pRegexchar;
@@ -411,7 +711,7 @@ struct SParser
 		{
 			assert(FChrCanBeginAtom(ChrCur()));
 
-			SRegexChar * pRegexchar = new SRegexChar();
+			SRegexChar * pRegexchar = m_poolRegex.PCreate<SRegexChar>();
 			pRegexchar->m_chr = ChrConsume();
 
 			return pRegexchar;
@@ -484,7 +784,7 @@ struct SParser
 
 		// convert mpChrF to a union of ranges
 
-		SUnion * pUnion = new SUnion();
+		SUnion * pUnion = m_poolRegex.PCreate<SUnion>();
 		
 		for(int iChr = 0; iChr < 256; ++iChr)
 		{
@@ -505,13 +805,13 @@ struct SParser
 				
 				if(chrBegin == iChr)
 				{
-					SRegexChar * pRegexchar = new SRegexChar();
+					SRegexChar * pRegexchar = m_poolRegex.PCreate<SRegexChar>();
 					pRegexchar->m_chr = chrBegin;
 					pUnion->m_arypRegex.push_back(pRegexchar);
 				}
 				else
 				{
-					SRange * pRange = new SRange();
+					SRange * pRange = m_poolRegex.PCreate<SRange>();
 					pRange->m_chrMic = chrBegin;
 					pRange->m_chrMac = iChr;
 					pUnion->m_arypRegex.push_back(pRange);
@@ -571,7 +871,17 @@ int main()
 
 	pRegex->PrintDebug();
 
-	delete pRegex;
+	State * pState = pRegex->PStateCreate();
+
+	MatchState * pMatch = m_poolState.PCreate<MatchState>();
+	pMatch->m_fAccepting = true;
+
+	pState->Patch(pMatch);
+
+	vector<StateTransitions *> arypTran;
+
+	m_poolRegex.Clear();
+	m_poolState.Clear();
 
 	return 0;
 }
