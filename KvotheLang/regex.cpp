@@ -33,29 +33,27 @@ struct Pool
 	vector<T*> m_aryp;
 };
 
-struct State;
-
-struct State
+struct SNfaState
 {
-	friend class State;
-	friend class OrState;
-	friend class MatchState;
+	friend class SNfaState;
+	friend class SNfaOrState;
+	friend class SNfaMatchState;
 	
-	virtual void Patch(State * pState) 
+	virtual void Patch(SNfaState * pState) 
 					{ m_fPatched = true; }
 
-	virtual vector<State*> AryPStateEpsilonClosure()
-							{ return vector<State*> { this }; }
+	virtual vector<SNfaState*> AryPStateEpsilonClosure()
+							{ return vector<SNfaState*> { this }; }
 protected:
 	bool m_fPatched = false;
-	vector<State*> m_aryPStateFrontier;
+	vector<SNfaState*> m_aryPStateFrontier;
 };
 
-Pool<State> m_poolState;
+Pool<SNfaState> m_poolState;
 
-struct OrState : public State
+struct SNfaOrState : public SNfaState
 {
-	void AddAlt(State* pState)
+	void AddAlt(SNfaState* pState)
 	{
 		assert(!m_fPatched);
 		
@@ -68,11 +66,11 @@ struct OrState : public State
 		}
 	}
 
-	void Patch(State * pStatePatch) override
+	void Patch(SNfaState * pStatePatch) override
 	{
-		State::Patch(pStatePatch);
+		SNfaState::Patch(pStatePatch);
 		
-		for(State * pState : m_aryPStateFrontier)
+		for(SNfaState * pState : m_aryPStateFrontier)
 		{
 			pState->Patch(pStatePatch);
 		}
@@ -90,25 +88,25 @@ struct OrState : public State
 		pStatePatch->m_aryPStateFrontier.clear();
 	}
 
-	vector<State*> AryPStateEpsilonClosure() override
+	vector<SNfaState*> AryPStateEpsilonClosure() override
 	{
 		// !!
 	}
 
 protected:
-	vector<State *> m_aryPState;
+	vector<SNfaState *> m_aryPState;
 };
 
-struct MatchState : State
+struct SNfaMatchState : SNfaState
 {
 	unsigned char m_chr;
 
-	MatchState()
+	SNfaMatchState()
 	{
 		m_aryPStateFrontier.push_back(this);
 	}
 
-	void SetNextState(State* pState)
+	void SetNextState(SNfaState* pState)
 	{
 		assert(!m_fPatched);
 		assert(!m_pStateNext);
@@ -121,9 +119,9 @@ struct MatchState : State
 		pState->m_aryPStateFrontier.clear();
 	}
 
-	void Patch(State * pStatePatch) override
+	void Patch(SNfaState * pStatePatch) override
 	{
-		State::Patch(pStatePatch);
+		SNfaState::Patch(pStatePatch);
 		
 		assert(pStatePatch);
 
@@ -133,7 +131,7 @@ struct MatchState : State
 		}
 		else
 		{
-			for(State * pState : m_aryPStateFrontier)
+			for(SNfaState * pState : m_aryPStateFrontier)
 			{
 				pState->Patch(pStatePatch);
 			}
@@ -146,7 +144,7 @@ struct MatchState : State
 
 protected:
 
-	State * m_pStateNext = nullptr;
+	SNfaState * m_pStateNext = nullptr;
 };
 
 struct SRegex // tag = regex
@@ -155,7 +153,7 @@ struct SRegex // tag = regex
 
 	virtual ~SRegex() {};
 
-	virtual State * PStateCreate() = 0;
+	virtual SNfaState * PStateCreate() = 0;
 };
 
 struct SRegexList : public SRegex // tag = regexlist
@@ -177,11 +175,11 @@ struct SUnion : public SRegexList // tag = union
 		printf(")");
 	}
 
-	State * PStateCreate() override
+	SNfaState * PStateCreate() override
 	{
 		assert(m_arypRegex.size() > 0);
 
-		OrState * pOrState = m_poolState.PCreate<OrState>();
+		SNfaOrState * pOrState = m_poolState.PCreate<SNfaOrState>();
 
 		for(SRegex * pRegex : m_arypRegex)
 		{
@@ -207,11 +205,11 @@ struct SConcatination : public SRegexList // tag = concat
 		printf(")");
 	}
 
-	State * PStateCreate() override
+	SNfaState * PStateCreate() override
 	{
 		assert(m_arypRegex.size() > 0);
 
-		State * pStateStart = m_arypRegex[0]->PStateCreate();
+		SNfaState * pStateStart = m_arypRegex[0]->PStateCreate();
 
 		for(int i = 1; i < m_arypRegex.size(); ++i)
 		{
@@ -237,7 +235,7 @@ struct SQuantifier : public SRegex // tag = quant
 		printf(")");
 	}
 
-	State * PStateCreateCount(int c)
+	SNfaState * PStateCreateCount(int c)
 	{
 		SConcatination concat;
 
@@ -246,16 +244,16 @@ struct SQuantifier : public SRegex // tag = quant
 			concat.m_arypRegex.push_back(m_pRegex);
 		}
 
-		State * pState = concat.PStateCreate();
+		SNfaState * pState = concat.PStateCreate();
 
 		return pState;
 	}
 
-	State * PStateCreateStar()
+	SNfaState * PStateCreateStar()
 	{
-		State * pState;
+		SNfaState * pState;
 
-		State * pStateQMark = PStateCreateQMark(&pState);
+		SNfaState * pStateQMark = PStateCreateQMark(&pState);
 
 		// loop pState back to the or State to turn the ? into a *
 
@@ -264,10 +262,10 @@ struct SQuantifier : public SRegex // tag = quant
 		return pStateQMark;
 	}
 
-	State * PStateCreateQMark(State ** ppState = nullptr)
+	SNfaState * PStateCreateQMark(SNfaState ** ppState = nullptr)
 	{
-		OrState * pOrState = m_poolState.PCreate<OrState>();
-		State * pState = m_pRegex->PStateCreate();
+		SNfaOrState * pOrState = m_poolState.PCreate<SNfaOrState>();
+		SNfaState * pState = m_pRegex->PStateCreate();
 		pOrState->AddAlt(pState);
 		pOrState->AddAlt(nullptr);
 
@@ -277,13 +275,13 @@ struct SQuantifier : public SRegex // tag = quant
 		return pState;
 	}
 
-	State * PStateCreateCountOptional(int c)
+	SNfaState * PStateCreateCountOptional(int c)
 	{
 		assert(c > 0);
 		
-		State * pState;
+		SNfaState * pState;
 
-		State * pStateQMark = PStateCreateQMark(&pState);
+		SNfaState * pStateQMark = PStateCreateQMark(&pState);
 
 		if(c > 1)
 		{
@@ -293,9 +291,9 @@ struct SQuantifier : public SRegex // tag = quant
 		return pStateQMark;
 	}
 
-	State * PStateCreate() override
+	SNfaState * PStateCreate() override
 	{
-		State * pState = nullptr;
+		SNfaState * pState = nullptr;
 
 		if(m_cMic > 0)
 		{
@@ -345,13 +343,13 @@ struct SRange : SRegex // tag = range
 		printf("('%c' - '%c')", m_chrMic, m_chrMac);
 	}
 
-	State * PStateCreate() override
+	SNfaState * PStateCreate() override
 	{
-		OrState * pOrState = m_poolState.PCreate<OrState>();
+		SNfaOrState * pOrState = m_poolState.PCreate<SNfaOrState>();
 
 		for(int iChr = m_chrMic; iChr <= m_chrMac; ++iChr)
 		{
-			MatchState * pMatch = m_poolState.PCreate<MatchState>();
+			SNfaMatchState * pMatch = m_poolState.PCreate<SNfaMatchState>();
 			pMatch->m_chr = iChr;
 
 			pOrState->AddAlt(pOrState);
@@ -370,9 +368,9 @@ struct SRegexChar : SRegex // tag = regexchr
 		printf("'%c'", m_chr);
 	}
 
-	State * PStateCreate() override
+	SNfaState * PStateCreate() override
 	{
-		MatchState * pMatch = m_poolState.PCreate<MatchState>();
+		SNfaMatchState * pMatch = m_poolState.PCreate<SNfaMatchState>();
 		pMatch->m_chr = m_chr;
 
 		return pMatch;
@@ -851,7 +849,7 @@ int main()
 
 	pRegex->PrintDebug();
 
-	State * pState = pRegex->PStateCreate();
+	SNfaState * pState = pRegex->PStateCreate();
 
 	m_poolRegex.Clear();
 	m_poolState.Clear();
