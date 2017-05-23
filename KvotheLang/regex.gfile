@@ -21,7 +21,7 @@ quant
 count
 	: '{' int '}'
 	| '{' int ',' int '}'
-	| '{' ',' int '}'
+	| '{' int ',' '}'
 	;
 
 int

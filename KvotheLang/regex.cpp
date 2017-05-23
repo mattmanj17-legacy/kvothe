@@ -477,33 +477,37 @@ struct SParser
 		
 		MatchChr('{');
 
-		pQuant->m_cMic = 0;
-
 		// three valid versions
 		// {N} exactly N times. N > 0
-		// {N1,N2} N1 to N2 times. N1 > 0 and N2 > N1
-		// {,N} 0 to N times. N > 0
-		
-		if(isdigit(ChrCur()))
-		{
-			// {N} or {N1,N2} case
-			
-			pQuant->m_cMic = NParse();
-			assert(pQuant->m_cMic > 0);
-		}
+		// {N,} at least N times. N >= 0
+		// {N1, N2} N1 to N2 times. N1 >= 0 and N2 > N1
 
-		if(pQuant->m_cMic == 0 || ChrCur() == ',')
+		assert(isdigit(ChrCur()));
+
+		pQuant->m_cMic = NParse();
+
+		assert(pQuant->m_cMic > 0 || ChrCur() == ',');
+
+		if(ChrCur() == ',')
 		{
-			// {N1,N2} or {,N} case
-			
 			MatchChr(',');
-			pQuant->m_cMac = NParse();
-			assert(pQuant->m_cMac > pQuant->m_cMic);
+
+			if(isdigit(ChrCur()))
+			{
+				pQuant->m_cMac = NParse();
+				assert(pQuant->m_cMac > pQuant->m_cMic);
+			}
+			else
+			{
+				// {N,} case
+
+				pQuant->m_cMac = -1;
+			}
 		}
 		else
 		{
 			// {N} case
-			
+
 			pQuant->m_cMac = pQuant->m_cMic;
 		}
 		
