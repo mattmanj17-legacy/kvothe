@@ -122,6 +122,9 @@ struct SNfaState
 
 	void EndPatch()
 	{
+		if(m_fPatching)
+			return;
+		
 		m_fPatching = false;
 
 		for(size_t iEpsilon = 0; iEpsilon < m_aryPStateEpsilon.size(); ++iEpsilon)
