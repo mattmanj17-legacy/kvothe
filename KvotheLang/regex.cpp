@@ -40,7 +40,7 @@ struct SNfaState;
 struct SNfaTransition
 {
 	SNfaState * m_pStateNext = nullptr;
-	char m_chr;
+	unsigned char m_chr;
 };
 
 struct SNfaState
@@ -63,8 +63,9 @@ struct SNfaState
 			printf("transitions:");
 			for(SNfaTransition tran : m_aryTran)
 			{
+				assert(tran.m_pStateNext);
 				printf(" ");
-				printf("'%c' -> %d", tran.m_chr, tran.m_pStateNext->m_id);
+				printf("%d '%c' -> %d", tran.m_chr, tran.m_chr, tran.m_pStateNext->m_id);
 			}
 			printf("\n");
 		}
@@ -74,7 +75,8 @@ struct SNfaState
 			printf("epsilon:");
 			for(SNfaState * pState : m_aryPStateEpsilon)
 			{
-				printf(" %d", pState ? pState->m_id : -2);
+				assert(pState);
+				printf(" %d", pState->m_id);
 			}
 			printf("\n");
 		}
@@ -87,7 +89,7 @@ struct SNfaState
 		
 		m_fPatching = true;
 
-		for(int iEpsilon = 0; iEpsilon < m_aryPStateEpsilon.size(); ++iEpsilon)
+		for(size_t iEpsilon = 0; iEpsilon < m_aryPStateEpsilon.size(); ++iEpsilon)
 		{
 			if(!m_aryPStateEpsilon[iEpsilon])
 			{
@@ -99,7 +101,7 @@ struct SNfaState
 			}
 		}
 
-		for(int iTran = 0; iTran < m_aryTran.size(); ++iTran)
+		for(size_t iTran = 0; iTran < m_aryTran.size(); ++iTran)
 		{
 			if(!m_aryTran[iTran].m_pStateNext)
 			{
@@ -118,7 +120,7 @@ struct SNfaState
 	{
 	}
 
-	void AddTransition(char chr, SNfaState * pStateNext)
+	void AddTransition(unsigned char chr, SNfaState * pStateNext)
 	{
 		m_aryTran.push_back({pStateNext, chr});
 	}
@@ -155,10 +157,11 @@ struct SUnion : public SRegexList // tag = union
 {
 	void PrintDebug() override
 	{
-		printf("(UNION ");
+		printf("(UNION");
 
 		for(SRegex * pRegex : m_arypRegex)
 		{
+			printf(" ");
 			pRegex->PrintDebug();
 		}
 
@@ -201,7 +204,7 @@ struct SConcatination : public SRegexList // tag = concat
 
 		SNfaState * pStateStart = m_arypRegex[0]->PStateCreate();
 
-		for(int i = 1; i < m_arypRegex.size(); ++i)
+		for(size_t i = 1; i < m_arypRegex.size(); ++i)
 		{
 			pStateStart->Patch(m_arypRegex[i]->PStateCreate());
 		}
@@ -262,7 +265,7 @@ struct SQuantifier : public SRegex // tag = quant
 		if(ppState)
 			(*ppState) = pState;
 
-		return pState;
+		return pOrState;
 	}
 
 	SNfaState * PStateCreateCountOptional(int c)
@@ -330,7 +333,7 @@ struct SRange : SRegex // tag = range
 
 	void PrintDebug() override
 	{
-		printf("('%c' - '%c')", m_chrMic, m_chrMac);
+		printf("(%d '%c' - %d '%c')", m_chrMic, m_chrMic, m_chrMac, m_chrMac);
 	}
 
 	SNfaState * PStateCreate() override
@@ -355,7 +358,7 @@ struct SRegexChar : SRegex // tag = regexchr
 
 	void PrintDebug() override
 	{
-		printf("'%c'", m_chr);
+		printf("%d '%c'", m_chr, m_chr);
 	}
 
 	SNfaState * PStateCreate() override
@@ -579,7 +582,7 @@ struct SParser
 
 	unsigned char ChrEscaped()
 	{
-		char chrEscape = ChrConsume();
+		unsigned char chrEscape = ChrConsume();
 
 		if(chrEscape == 'a')		return '\a';
 		else if(chrEscape == 'b')	return '\b';
@@ -594,7 +597,7 @@ struct SParser
 			// \cA control character
 			
 			assert(isalpha(ChrCur()));
-			char chr = tolower(ChrConsume());
+			unsigned char chr = tolower(ChrConsume());
 			return chr - 'a' + 1;
 		}
 		else if(chrEscape == 'x')
@@ -628,18 +631,18 @@ struct SParser
 		else
 		{
 			assert(
-				ChrCur() == '.' ||
-				ChrCur() == '\\' ||
-				ChrCur() == '(' ||
-				ChrCur() == ')' ||
-				ChrCur() == '|' ||
-				ChrCur() == '*' ||
-				ChrCur() == '+' ||
-				ChrCur() == '?' ||
-				ChrCur() == '{' ||
-				ChrCur() == '}' || 
-				ChrCur() == '[' ||
-				ChrCur() == ']'
+				chrEscape == '.' ||
+				chrEscape == '\\' ||
+				chrEscape == '(' ||
+				chrEscape == ')' ||
+				chrEscape == '|' ||
+				chrEscape == '*' ||
+				chrEscape == '+' ||
+				chrEscape == '?' ||
+				chrEscape == '{' ||
+				chrEscape == '}' || 
+				chrEscape == '[' ||
+				chrEscape == ']'
 			);
 
 			return chrEscape;
@@ -727,7 +730,12 @@ struct SParser
 
 		// store elements of this set in a map from chr to bool (to convert to ranges later)
 		
-		bool mpChrFIncluded[256] = { fNegate };
+		bool mpChrFIncluded[256];
+
+		for(int iChr = 0; iChr < 256; ++iChr)
+		{
+			mpChrFIncluded[iChr] = fNegate;
+		}
 
 		assert(FChrIsValidSetChrStart());
 		while(FChrIsValidSetChrStart())
@@ -801,7 +809,7 @@ struct SParser
 
 	unsigned char ChrConsume()
 	{
-		char chrPrev = m_chrCur;
+		unsigned char chrPrev = m_chrCur;
 		m_chrCur = (unsigned char)fgetc(m_pFile);
 
 		return chrPrev;
@@ -837,6 +845,8 @@ int main()
 
 	SRegex * pRegex = parser.RegexFileParse();
 
+	printf("regex print debug:\n\n");
+
 	pRegex->PrintDebug();
 
 	SNfaState * pState = pRegex->PStateCreate();
@@ -845,6 +855,8 @@ int main()
 	stateAccept.m_id = -1;
 
 	pState->Patch(&stateAccept);
+
+	printf("\n\nNFA print debug:\n");
 
 	for(SNfaState* pState : m_poolState.m_aryp)
 	{
