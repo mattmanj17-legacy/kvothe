@@ -82,7 +82,13 @@ struct SNfaState
 		}
 	}
 	
-	void Patch(SNfaState * pState) 
+	void Patch(SNfaState * pState)
+	{
+		BeginPatch(pState);
+		EndPatch();
+	}
+
+	void BeginPatch(SNfaState * pState) 
 	{ 
 		if(m_fPatching)
 			return;
@@ -97,7 +103,7 @@ struct SNfaState
 			}
 			else
 			{
-				m_aryPStateEpsilon[iEpsilon]->Patch(pState);
+				m_aryPStateEpsilon[iEpsilon]->BeginPatch(pState);
 			}
 		}
 
@@ -109,11 +115,26 @@ struct SNfaState
 			}
 			else
 			{
-				m_aryTran[iTran].m_pStateNext->Patch(pState);
+				m_aryTran[iTran].m_pStateNext->BeginPatch(pState);
 			}
 		}
+	}
 
+	void EndPatch()
+	{
 		m_fPatching = false;
+
+		for(size_t iEpsilon = 0; iEpsilon < m_aryPStateEpsilon.size(); ++iEpsilon)
+		{
+			if(m_aryPStateEpsilon[iEpsilon])
+				m_aryPStateEpsilon[iEpsilon]->EndPatch();
+		}
+
+		for(size_t iTran = 0; iTran < m_aryTran.size(); ++iTran)
+		{
+			if(m_aryTran[iTran].m_pStateNext)
+				m_aryTran[iTran].m_pStateNext->EndPatch();
+		}
 	}
 
 	vector<SNfaState*> AryPStateEpsilonClosure()
