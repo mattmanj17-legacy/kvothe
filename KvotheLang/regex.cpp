@@ -81,68 +81,6 @@ struct SNfaState
 			printf("\n");
 		}
 	}
-	
-	void Patch(SNfaState * pState)
-	{
-		BeginPatch(pState);
-		EndPatch();
-	}
-
-	void BeginPatch(SNfaState * pState) 
-	{ 
-		if(m_fPatching)
-			return;
-		
-		m_fPatching = true;
-
-		for(size_t iEpsilon = 0; iEpsilon < m_aryPStateEpsilon.size(); ++iEpsilon)
-		{
-			if(!m_aryPStateEpsilon[iEpsilon])
-			{
-				m_aryPStateEpsilon[iEpsilon] = pState;
-			}
-			else
-			{
-				m_aryPStateEpsilon[iEpsilon]->BeginPatch(pState);
-			}
-		}
-
-		for(size_t iTran = 0; iTran < m_aryTran.size(); ++iTran)
-		{
-			if(!m_aryTran[iTran].m_pStateNext)
-			{
-				m_aryTran[iTran].m_pStateNext = pState;
-			}
-			else
-			{
-				m_aryTran[iTran].m_pStateNext->BeginPatch(pState);
-			}
-		}
-	}
-
-	void EndPatch()
-	{
-		if(m_fPatching)
-			return;
-		
-		m_fPatching = false;
-
-		for(size_t iEpsilon = 0; iEpsilon < m_aryPStateEpsilon.size(); ++iEpsilon)
-		{
-			if(m_aryPStateEpsilon[iEpsilon])
-				m_aryPStateEpsilon[iEpsilon]->EndPatch();
-		}
-
-		for(size_t iTran = 0; iTran < m_aryTran.size(); ++iTran)
-		{
-			if(m_aryTran[iTran].m_pStateNext)
-				m_aryTran[iTran].m_pStateNext->EndPatch();
-		}
-	}
-
-	vector<SNfaState*> AryPStateEpsilonClosure()
-	{
-	}
 
 	void AddTransition(unsigned char chr, SNfaState * pStateNext)
 	{
@@ -154,7 +92,44 @@ struct SNfaState
 		m_aryPStateEpsilon.push_back(pStateNext);
 	}
 
-protected:
+	void Patch(SNfaState * pState)
+	{
+		for(size_t iEpsilon = 0; iEpsilon < m_aryPStateEpsilon.size(); ++iEpsilon)
+		{
+			if(!m_aryPStateEpsilon[iEpsilon])
+			{
+				m_aryPStateEpsilon[iEpsilon] = pState;
+			}
+		}
+
+		for(size_t iTran = 0; iTran < m_aryTran.size(); ++iTran)
+		{
+			if(!m_aryTran[iTran].m_pStateNext)
+			{
+				m_aryTran[iTran].m_pStateNext = pState;
+			}
+		}
+	}
+
+	bool FUnpatched()
+	{
+		// BB (matthewd) cache this value instead?
+		
+		for(size_t iEpsilon = 0; iEpsilon < m_aryPStateEpsilon.size(); ++iEpsilon)
+		{
+			if(!m_aryPStateEpsilon[iEpsilon])
+				return true;
+		}
+
+		for(size_t iTran = 0; iTran < m_aryTran.size(); ++iTran)
+		{
+			if(!m_aryTran[iTran].m_pStateNext)
+				return true;
+		}
+
+		return false;
+	}
+
 	bool m_fPatching = false;
 	vector<SNfaState*> m_aryPStateEpsilon;
 	vector<SNfaTransition> m_aryTran;
@@ -163,13 +138,55 @@ int SNfaState::idNext = 0;
 
 Pool<SNfaState> m_poolState;
 
+struct SNfa
+{
+	SNfaState * m_pStateBegin;
+
+	vector<SNfaState *> m_arypStateUnpatched;
+
+	void Patch(SNfa nfa)
+	{
+		for(SNfaState * pState : m_arypStateUnpatched)
+		{
+			pState->Patch(nfa.m_pStateBegin);
+		}
+
+		m_arypStateUnpatched.clear();
+
+		// we cant just set m_arypStateUnpatched = nfa.m_arypStateUnpatched,
+		// because m_arypStateUnpatched and nfa.m_arypStateUnpatched are not garenteed to be disjoint
+		// so we may have already patched some of the nodes in nfa.m_arypStateUnpatched
+		// BB (matthewd) hmm.... i dont like this
+		
+		for(SNfaState * pState : nfa.m_arypStateUnpatched)
+		{
+			if(pState->FUnpatched())
+			{
+				m_arypStateUnpatched.push_back(pState);
+			}
+		}
+	}
+
+	SNfa()
+	: m_pStateBegin(nullptr)
+	, m_arypStateUnpatched()
+	{
+	}
+
+	SNfa(SNfaState * pStateBegin, vector<SNfaState *> arypStateUnpatched)
+	: m_pStateBegin(pStateBegin)
+	, m_arypStateUnpatched(arypStateUnpatched)
+	{
+	}
+};
+
 struct SRegex // tag = regex
 {
 	virtual void PrintDebug() = 0;
 
 	virtual ~SRegex(){};
 
-	virtual SNfaState * PStateCreate() = 0;
+	virtual SNfa NfaCreate() = 0;
 };
 
 struct SRegexList : public SRegex // tag = regexlist
@@ -192,18 +209,22 @@ struct SUnion : public SRegexList // tag = union
 		printf(")");
 	}
 
-	SNfaState * PStateCreate() override
+	SNfa NfaCreate() override
 	{
 		assert(m_arypRegex.size() > 0);
 
 		SNfaState * pOrState = m_poolState.PCreate<SNfaState>();
 
+		vector<SNfaState *> arypStateUnpatched;
+
 		for(SRegex * pRegex : m_arypRegex)
 		{
-			pOrState->AddEpsilon(pRegex->PStateCreate());
+			SNfa nfaAlt = pRegex->NfaCreate();
+			arypStateUnpatched.insert(arypStateUnpatched.end(), nfaAlt.m_arypStateUnpatched.begin(), nfaAlt.m_arypStateUnpatched.end());
+			pOrState->AddEpsilon(nfaAlt.m_pStateBegin);
 		}
 
-		return pOrState;
+		return SNfa(pOrState, arypStateUnpatched);
 	}
 };
 
@@ -222,18 +243,18 @@ struct SConcatination : public SRegexList // tag = concat
 		printf(")");
 	}
 
-	SNfaState * PStateCreate() override
+	SNfa NfaCreate() override
 	{
 		assert(m_arypRegex.size() > 0);
 
-		SNfaState * pStateStart = m_arypRegex[0]->PStateCreate();
+		SNfa nfa = m_arypRegex[0]->NfaCreate();
 
 		for(size_t i = 1; i < m_arypRegex.size(); ++i)
 		{
-			pStateStart->Patch(m_arypRegex[i]->PStateCreate());
+			nfa.Patch(m_arypRegex[i]->NfaCreate());
 		}
 
-		return pStateStart;
+		return nfa;
 	}
 };
 
@@ -252,7 +273,7 @@ struct SQuantifier : public SRegex // tag = quant
 		printf(")");
 	}
 
-	SNfaState * PStateCreateCount(int c)
+	SNfa NfaCreateCount(int c)
 	{
 		SConcatination concat;
 
@@ -261,92 +282,113 @@ struct SQuantifier : public SRegex // tag = quant
 			concat.m_arypRegex.push_back(m_pRegex);
 		}
 
-		SNfaState * pState = concat.PStateCreate();
-
-		return pState;
+		return concat.NfaCreate();
 	}
 
-	SNfaState * PStateCreateStar()
+	SNfa NfaCreateStar()
 	{
-		SNfaState * pState;
-
-		SNfaState * pStateQMark = PStateCreateQMark(&pState);
-
-		// loop pState back to the orState to turn the ? into a *
-
-		pState->Patch(pStateQMark);
-
-		return pStateQMark;
-	}
-
-	SNfaState * PStateCreateQMark(SNfaState ** ppState = nullptr)
-	{
+		// create a ?
+		
 		SNfaState * pOrState = m_poolState.PCreate<SNfaState>();
-		SNfaState * pState = m_pRegex->PStateCreate();
-		pOrState->AddEpsilon(pState);
+		SNfa nfa = m_pRegex->NfaCreate();
+		pOrState->AddEpsilon(nfa.m_pStateBegin);
 		pOrState->AddEpsilon(nullptr);
 
-		if(ppState)
-			(*ppState) = pState;
+		// the final nfa will only have one unpatched node, the starting node, 
+		// because the nfa created from m_pregex is patched back to pOrState
 
-		return pOrState;
+		SNfa nfaStar(pOrState, { pOrState });
+
+		// loop back the nfa created from m_pregex to pOrState
+		// turning a ? into a *
+
+		nfa.Patch(nfaStar);
+
+		return nfaStar;
 	}
 
-	SNfaState * PStateCreateCountOptional(int c)
+	SNfa NfaCreateQMark()
+	{
+		// create a ?
+		
+		SNfaState * pOrState = m_poolState.PCreate<SNfaState>();
+		SNfa nfa = m_pRegex->NfaCreate();
+		pOrState->AddEpsilon(nfa.m_pStateBegin);
+		pOrState->AddEpsilon(nullptr);
+
+		// the unpatched states are pOrState and all the unpatched states of
+		// the nfa created from m_pRegex
+
+		vector<SNfaState *> arypStateUnpatched;
+		arypStateUnpatched.push_back(pOrState);
+		arypStateUnpatched.insert(arypStateUnpatched.end(), nfa.m_arypStateUnpatched.begin(), nfa.m_arypStateUnpatched.end());
+
+		return SNfa(pOrState, arypStateUnpatched);
+	}
+
+	SNfa NfaCreateCountOptional(int c)
 	{
 		assert(c > 0);
+
+		// create nested ?'s, starting on the right and working
+		// back to the left to the starting node
 		
-		SNfaState * pState;
+		SNfa nfaLeftMost;
 
-		SNfaState * pStateQMark = PStateCreateQMark(&pState);
-
-		if(c > 1)
+		for(int iC = c; iC > 0; --iC)
 		{
-			pState->Patch(PStateCreateCountOptional(c-1));
+			SNfa nfaQMark = NfaCreateQMark();
+
+			if(nfaLeftMost.m_pStateBegin)
+			{
+				nfaQMark.Patch(nfaLeftMost);
+			}
+
+			nfaLeftMost = nfaQMark;
 		}
 
-		return pStateQMark;
+		return nfaLeftMost;
 	}
 
-	SNfaState * PStateCreate() override
+	SNfa NfaCreate() override
 	{
-		SNfaState * pState = nullptr;
+		SNfa nfa;
 
 		if(m_cMic > 0)
 		{
-			pState = PStateCreateCount(m_cMic);
+			nfa = NfaCreateCount(m_cMic);
 		}
 
 		if(m_cMac == -1)
 		{
-			if(pState)
+			if(nfa.m_pStateBegin)
 			{
-				pState->Patch(PStateCreateStar());
+				nfa.Patch(NfaCreateStar());
 			}
 			else
 			{
-				pState = PStateCreateStar();
+				nfa = NfaCreateStar();
 			}
 
-			return pState;
+			return nfa;
 		}
 
 		if(m_cMac <= m_cMic)
 		{
-			assert(pState);
-			return pState;
+			assert(nfa.m_pStateBegin);
+			return nfa;
 		}
 
-		if(pState)
+		if(nfa.m_pStateBegin)
 		{
-			pState->Patch(PStateCreateCountOptional(m_cMac - m_cMic));
+			nfa.Patch(NfaCreateCountOptional(m_cMac - m_cMic));
 		}
 		else
 		{
-			pState = PStateCreateCountOptional(m_cMac - m_cMic);
+			nfa = NfaCreateCountOptional(m_cMac - m_cMic);
 		}
 
-		return pState;
+		return nfa;
 	}
 };
 
@@ -360,7 +402,7 @@ struct SRange : SRegex // tag = range
 		printf("(%d '%c' - %d '%c')", m_chrMic, m_chrMic, m_chrMac, m_chrMac);
 	}
 
-	SNfaState * PStateCreate() override
+	SNfa NfaCreate() override
 	{
 		SNfaState * pOrState = m_poolState.PCreate<SNfaState>();
 
@@ -372,7 +414,7 @@ struct SRange : SRegex // tag = range
 			pOrState->AddEpsilon(pMatchState);
 		}
 
-		return pOrState;
+		return SNfa(pOrState, pOrState->m_aryPStateEpsilon);
 	}
 };
 
@@ -385,12 +427,12 @@ struct SRegexChar : SRegex // tag = regexchr
 		printf("%d '%c'", m_chr, m_chr);
 	}
 
-	SNfaState * PStateCreate() override
+	SNfa NfaCreate() override
 	{
 		SNfaState * pMatchState = m_poolState.PCreate<SNfaState>();
 		pMatchState->AddTransition(m_chr, nullptr);
 
-		return pMatchState;
+		return SNfa(pMatchState, { pMatchState });
 	}
 };
 
@@ -877,12 +919,12 @@ int main()
 
 	pRegex->PrintDebug();
 
-	SNfaState * pState = pRegex->PStateCreate();
+	SNfa nfa = pRegex->NfaCreate();
 
 	SNfaState stateAccept;
 	stateAccept.m_id = -1;
 
-	pState->Patch(&stateAccept);
+	nfa.Patch(SNfa(&stateAccept, {}));
 
 	printf("\n\nNFA print debug:\n");
 
