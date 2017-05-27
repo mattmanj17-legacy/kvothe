@@ -5,13 +5,18 @@
 #include <stdio.h>
 #include <assert.h>
 #include <queue>
+#include <set>
+#include <map>
 
 using std::vector;
 using std::string;
 using std::queue;
+using std::set;
+using std::map;
+using std::pair;
 
 template<typename T>
-struct Pool // tag = pool
+struct Pool
 {
 	template<typename TDerived>
 	TDerived* PTNew()
@@ -35,15 +40,7 @@ struct Pool // tag = pool
 	vector<T*> m_arypT;
 };
 
-struct SNfaState;
-
-struct SNfaTransition // tag = nfat
-{
-	SNfaState * m_pNfasNext = nullptr;
-	unsigned char m_chr;
-};
-
-struct SNfaState // tag = nfas
+struct SNfaState
 {
 	static int s_nIdNext;
 	int m_nId;
@@ -58,22 +55,23 @@ struct SNfaState // tag = nfas
 		printf("\n");
 		printf("state %d:\n", m_nId);
 		
-		if(m_aryNfat.size() > 0)
+		if(m_transitions.size() > 0)
 		{
 			printf("transitions:");
-			for(SNfaTransition nfat : m_aryNfat)
+
+			for(pair<unsigned char, SNfaState*> transition : m_transitions)
 			{
-				assert(nfat.m_pNfasNext);
+				assert(transition.second);
 				printf(" ");
-				printf("%d '%c' -> %d", nfat.m_chr, nfat.m_chr, nfat.m_pNfasNext->m_nId);
+				printf("%d '%c' -> %d", transition.first, transition.first, transition.second->m_nId);
 			}
 			printf("\n");
 		}
 
-		if(m_arypNfasEpsilon.size() > 0)
+		if(m_aryEpsilon.size() > 0)
 		{
 			printf("epsilon:");
-			for(SNfaState * nfas : m_arypNfasEpsilon)
+			for(SNfaState * nfas : m_aryEpsilon)
 			{
 				assert(nfas);
 				printf(" %d", nfas->m_nId);
@@ -84,29 +82,29 @@ struct SNfaState // tag = nfas
 
 	void AddTransition(unsigned char chr, SNfaState * pNfas)
 	{
-		m_aryNfat.push_back({pNfas, chr});
+		m_transitions[chr] = pNfas;
 	}
 
 	void AddEpsilon(SNfaState * pNfas)
 	{
-		m_arypNfasEpsilon.push_back(pNfas);
+		m_aryEpsilon.push_back(pNfas);
 	}
 
 	void Patch(SNfaState * pNfas)
 	{
-		for(size_t ipNfasEpsilon = 0; ipNfasEpsilon < m_arypNfasEpsilon.size(); ++ipNfasEpsilon)
+		for(size_t iEpsilon = 0; iEpsilon < m_aryEpsilon.size(); ++iEpsilon)
 		{
-			if(!m_arypNfasEpsilon[ipNfasEpsilon])
+			if(!m_aryEpsilon[iEpsilon])
 			{
-				m_arypNfasEpsilon[ipNfasEpsilon] = pNfas;
+				m_aryEpsilon[iEpsilon] = pNfas;
 			}
 		}
 
-		for(size_t iNfat = 0; iNfat < m_aryNfat.size(); ++iNfat)
+		for(pair<unsigned char, SNfaState*> transition : m_transitions)
 		{
-			if(!m_aryNfat[iNfat].m_pNfasNext)
+			if(!transition.second)
 			{
-				m_aryNfat[iNfat].m_pNfasNext = pNfas;
+				m_transitions[transition.first] = pNfas;
 			}
 		}
 	}
@@ -115,114 +113,225 @@ struct SNfaState // tag = nfas
 	{
 		// BB (matthewd) cache this value instead?
 		
-		for(size_t ipNfasEpsilon = 0; ipNfasEpsilon < m_arypNfasEpsilon.size(); ++ipNfasEpsilon)
+		for(size_t iEpsilon = 0; iEpsilon < m_aryEpsilon.size(); ++iEpsilon)
 		{
-			if(!m_arypNfasEpsilon[ipNfasEpsilon])
+			if(!m_aryEpsilon[iEpsilon])
 				return true;
 		}
 
-		for(size_t iNfat = 0; iNfat < m_aryNfat.size(); ++iNfat)
+		for(pair<unsigned char, SNfaState*> transition : m_transitions)
 		{
-			if(!m_aryNfat[iNfat].m_pNfasNext)
+			if(!transition.second)
 				return true;
 		}
 
 		return false;
 	}
 
-	vector<SNfaState*> AryPStateEpsilonClosure()
+	set<SNfaState*> EClosure()
 	{
 		// breadth first search for nodes we can reach by 0 or more epsilon transitions
 		
-		vector<SNfaState*> arypNfasEpsilon;
+		set<SNfaState*> eclosure;
 		queue<SNfaState*> qpNfas;
 		qpNfas.push(this);
 
 		while(qpNfas.size() > 0)
 		{
-			SNfaState* pState = qpNfas.front();
+			SNfaState* pNfas = qpNfas.front();
 			qpNfas.pop();
 
-			if(std::find(arypNfasEpsilon.begin(), arypNfasEpsilon.end(), pState) == arypNfasEpsilon.end())
+			if(eclosure.find(pNfas) == eclosure.end())
 			{
-				for(SNfaState* pStateEpsilon : pState->m_arypNfasEpsilon)
+				eclosure.insert(pNfas);
+				
+				for(SNfaState* pStateEpsilon : pNfas->m_aryEpsilon)
 				{
 					qpNfas.push(pStateEpsilon);
 				}
 			}
 		}
 
-		return arypNfasEpsilon;
+		return eclosure;
 	}
 
-	vector<SNfaState*> m_arypNfasEpsilon;
-	vector<SNfaTransition> m_aryNfat;
+	vector<SNfaState*> m_aryEpsilon;
+	map<unsigned char, SNfaState*> m_transitions;
 };
 int SNfaState::s_nIdNext = 0;
 
 Pool<SNfaState> g_poolNfas;
 
-struct SNfa // tag = nfa
+struct SNfa
 {
-	SNfaState * m_pNfasBegin;
-	vector<SNfaState *> m_arypNfasUnpatched;
+	SNfaState * m_pStateBegin;
+	vector<SNfaState *> m_aryUnpatched;
 
 	void Patch(SNfa nfa)
 	{
-		for(SNfaState * Nfas : m_arypNfasUnpatched)
+		for(SNfaState * Nfas : m_aryUnpatched)
 		{
-			Nfas->Patch(nfa.m_pNfasBegin);
+			Nfas->Patch(nfa.m_pStateBegin);
 		}
 
-		m_arypNfasUnpatched.clear();
+		m_aryUnpatched.clear();
 
 		// we cant just set m_arypStateUnpatched = nfa.m_arypStateUnpatched,
 		// because m_arypStateUnpatched and nfa.m_arypStateUnpatched are not garenteed to be disjoint
 		// so we may have already patched some of the nodes in nfa.m_arypStateUnpatched
 		// BB (matthewd) hmm.... i dont like this
 		
-		for(SNfaState * Nfas : nfa.m_arypNfasUnpatched)
+		for(SNfaState * Nfas : nfa.m_aryUnpatched)
 		{
 			if(Nfas->FUnpatched())
 			{
-				m_arypNfasUnpatched.push_back(Nfas);
+				m_aryUnpatched.push_back(Nfas);
 			}
 		}
 	}
 
 	SNfa()
-	: m_pNfasBegin(nullptr)
-	, m_arypNfasUnpatched()
+	: m_pStateBegin(nullptr)
+	, m_aryUnpatched()
 	{
 	}
 
-	SNfa(SNfaState * pNfas, vector<SNfaState *> arypNfasUnpatched)
-	: m_pNfasBegin(pNfas)
-	, m_arypNfasUnpatched(arypNfasUnpatched)
+	SNfa(SNfaState * pNfas, vector<SNfaState *> aryUnpatched)
+	: m_pStateBegin(pNfas)
+	, m_aryUnpatched(aryUnpatched)
 	{
 	}
-};
-
-struct SDfaState;
-
-struct SDfaTransition // tag = dfat
-{
-	SDfaState * m_pDfasNext = nullptr;
-	unsigned char m_chr;
 };
 
 struct SDfaState // tag = dfas
 {
+	SDfaState()
+	{
+		m_nId = ++s_nIdNext;
+	}
+
+	void PrintDebug()
+	{
+		printf("state %d:\n", m_nId);
+
+		if(m_fIsFinal)
+		{
+			printf("accepting state!\n");
+		}
+		
+		if(m_transitions.size() > 0)
+		{
+			printf("transitions:\n");
+
+			for(pair<unsigned char, SDfaState*> transition : m_transitions)
+			{
+				assert(transition.second);
+				printf("%d '%c' -> %d", transition.first, transition.first, transition.second->m_nId);
+				printf("\n");
+			}
+		}
+	}
+
+	map<unsigned char, SDfaState *> m_transitions;
 	static int s_nIdNext;
 	int m_nId;
-
-	vector<SDfaTransition> m_aryTran;
+	bool m_fIsFinal = false;
 };
 int SDfaState::s_nIdNext = 0;
 
 Pool<SDfaState> g_poolDfas;
 
-//SDfaState * PState
+set<SNfaState *> EClosureForStates(vector<SNfaState *> aryStates)
+{
+	set<SNfaState *> eclosure;
+
+	for(SNfaState * pNfas : aryStates)
+	{
+		for(SNfaState * pNfasEpsilon : pNfas->EClosure())
+		{
+			eclosure.insert(pNfasEpsilon);
+		}
+	}
+
+	return eclosure;
+}
+
+SDfaState * DfaFromNfa(SNfaState * pNfasBegin, SNfaState * pNfasEnd)
+{
+	typedef set<SNfaState *> EClosure;
+	
+	queue<EClosure> EClosureUnmarked;
+	set<EClosure> EClosureMarked;
+	map<EClosure, map<char, EClosure>> Move;
+
+	EClosure eclosureBegin = pNfasBegin->EClosure();
+
+	EClosureUnmarked.push(eclosureBegin);
+
+	while(EClosureUnmarked.size() > 0)
+	{
+		EClosure T = EClosureUnmarked.front();
+		EClosureUnmarked.pop();
+
+		EClosureMarked.insert(T);
+
+		map<char, set<SNfaState *>> transitions;
+
+		for(SNfaState * pNfas : T)
+		{
+			for(pair<char, SNfaState *> tran : pNfas->m_transitions)
+			{
+				transitions[tran.first].insert(tran.second);
+			}
+		}
+
+		for(pair<char, set<SNfaState *>> tran : transitions)
+		{
+			EClosure S;
+
+			for(SNfaState * pNfasTran : tran.second)
+			{
+				for(SNfaState * pNfasE : pNfasTran->EClosure())
+				{
+					S.insert(pNfasE);
+				}
+			}
+
+			if(EClosureMarked.count(S) == 0)
+			{
+				EClosureUnmarked.push(S);
+			}
+
+			Move[T][tran.first] = S;
+		}
+	}
+
+	map<EClosure, SDfaState *> dfass;
+
+	for(pair<EClosure, map<char, EClosure>> move : Move)
+	{
+		dfass[move.first] = g_poolDfas.PTNew<SDfaState>();
+
+		for(SNfaState * pNfas : move.first)
+		{
+			if(pNfas == pNfasEnd)
+			{
+				dfass[move.first]->m_fIsFinal = true;
+				break;
+			}
+		}
+	}
+
+	for(pair<EClosure, map<char, EClosure>> move : Move)
+	{
+		for(pair<char, EClosure> tran : move.second)
+		{
+			dfass[move.first]->m_transitions[tran.first] = dfass[tran.second];
+		}
+	}
+
+	return dfass[eclosureBegin];
+}
 
 struct SRegex // tag = regex
 {
@@ -259,16 +368,16 @@ struct SUnion : public SRegexList // tag = union
 
 		SNfaState * pNfasOr = g_poolNfas.PTNew<SNfaState>();
 
-		vector<SNfaState *> arypNfasUnpatched;
+		vector<SNfaState *> aryUnpatched;
 
 		for(SRegex * pRegex : m_arypRegex)
 		{
 			SNfa nfaAlt = pRegex->NfaCreate();
-			arypNfasUnpatched.insert(arypNfasUnpatched.end(), nfaAlt.m_arypNfasUnpatched.begin(), nfaAlt.m_arypNfasUnpatched.end());
-			pNfasOr->AddEpsilon(nfaAlt.m_pNfasBegin);
+			aryUnpatched.insert(aryUnpatched.end(), nfaAlt.m_aryUnpatched.begin(), nfaAlt.m_aryUnpatched.end());
+			pNfasOr->AddEpsilon(nfaAlt.m_pStateBegin);
 		}
 
-		return SNfa(pNfasOr, arypNfasUnpatched);
+		return SNfa(pNfasOr, aryUnpatched);
 	}
 };
 
@@ -335,7 +444,7 @@ struct SQuantifier : public SRegex // tag = quant
 		
 		SNfaState * pNfasOr = g_poolNfas.PTNew<SNfaState>();
 		SNfa nfa = m_pRegex->NfaCreate();
-		pNfasOr->AddEpsilon(nfa.m_pNfasBegin);
+		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
 		pNfasOr->AddEpsilon(nullptr);
 
 		// the final nfa will only have one unpatched node, the starting node, 
@@ -357,17 +466,17 @@ struct SQuantifier : public SRegex // tag = quant
 		
 		SNfaState * pNfasOr = g_poolNfas.PTNew<SNfaState>();
 		SNfa nfa = m_pRegex->NfaCreate();
-		pNfasOr->AddEpsilon(nfa.m_pNfasBegin);
+		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
 		pNfasOr->AddEpsilon(nullptr);
 
 		// the unpatched states are pOrState and all the unpatched states of
 		// the nfa created from m_pRegex
 
-		vector<SNfaState *> arypNfasUnpatched;
-		arypNfasUnpatched.push_back(pNfasOr);
-		arypNfasUnpatched.insert(arypNfasUnpatched.end(), nfa.m_arypNfasUnpatched.begin(), nfa.m_arypNfasUnpatched.end());
+		vector<SNfaState *> aryUnpatched;
+		aryUnpatched.push_back(pNfasOr);
+		aryUnpatched.insert(aryUnpatched.end(), nfa.m_aryUnpatched.begin(), nfa.m_aryUnpatched.end());
 
-		return SNfa(pNfasOr, arypNfasUnpatched);
+		return SNfa(pNfasOr, aryUnpatched);
 	}
 
 	SNfa NfaCreateCountOptional(int c)
@@ -383,7 +492,7 @@ struct SQuantifier : public SRegex // tag = quant
 		{
 			SNfa nfaQMark = NfaCreateQMark();
 
-			if(nfaLeftMost.m_pNfasBegin)
+			if(nfaLeftMost.m_pStateBegin)
 			{
 				nfaQMark.Patch(nfaLeftMost);
 			}
@@ -405,7 +514,7 @@ struct SQuantifier : public SRegex // tag = quant
 
 		if(m_cMac == -1)
 		{
-			if(nfa.m_pNfasBegin)
+			if(nfa.m_pStateBegin)
 			{
 				nfa.Patch(NfaCreateStar());
 			}
@@ -419,11 +528,11 @@ struct SQuantifier : public SRegex // tag = quant
 
 		if(m_cMac <= m_cMic)
 		{
-			assert(nfa.m_pNfasBegin);
+			assert(nfa.m_pStateBegin);
 			return nfa;
 		}
 
-		if(nfa.m_pNfasBegin)
+		if(nfa.m_pStateBegin)
 		{
 			nfa.Patch(NfaCreateCountOptional(m_cMac - m_cMic));
 		}
@@ -458,7 +567,7 @@ struct SRange : SRegex // tag = range
 			pNfasOr->AddEpsilon(pNfasChr);
 		}
 
-		return SNfa(pNfasOr, pNfasOr->m_arypNfasEpsilon);
+		return SNfa(pNfasOr, pNfasOr->m_aryEpsilon);
 	}
 };
 
@@ -957,24 +1066,41 @@ int main()
 
 	parser.SetInput(pFile);
 
-	SNfa nfa;
+	SDfaState * pDfas = nullptr;
 	
 	{
-		SRegex * pRegex = parser.RegexFileParse();
+		SNfa nfa;
+	
+		{
+			SRegex * pRegex = parser.RegexFileParse();
 
-		nfa = pRegex->NfaCreate();
+			nfa = pRegex->NfaCreate();
 
-		// dont need the regex anymore
+			// dont need the regex anymore
 		
-		g_poolRegex.Clear();
+			g_poolRegex.Clear();
+		}
+
+		SNfaState stateAccept;
+		stateAccept.m_nId = -1; // for debugging
+
+		nfa.Patch(SNfa(&stateAccept, {}));
+
+		pDfas = DfaFromNfa(nfa.m_pStateBegin, &stateAccept);
+
+		// dont need the nfa anymore
+
+		g_poolNfas.Clear();
 	}
 
-	SNfaState stateAccept;
-	stateAccept.m_nId = -1;
+	for(SDfaState * pDfas : g_poolDfas.m_arypT)
+	{
+		printf("\n");
+		pDfas->PrintDebug();
+		printf("\n");
+	}
 
-	nfa.Patch(SNfa(&stateAccept, {}));
-
-	g_poolNfas.Clear();
+	g_poolDfas.Clear();
 
 	return 0;
 }
