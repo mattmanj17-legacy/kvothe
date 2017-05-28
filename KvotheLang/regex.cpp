@@ -260,20 +260,21 @@ SDfaState * DfaFromNfa(SNfaState * pNfasBegin, SNfaState * pNfasEnd)
 {
 	typedef set<SNfaState *> EClosure;
 	
-	queue<EClosure> EClosureUnmarked;
-	set<EClosure> EClosureMarked;
+	queue<EClosure> EClosureQ;
+	set<EClosure> EClosureEverInQ;
 	map<EClosure, map<char, EClosure>> Move;
 
 	EClosure eclosureBegin = pNfasBegin->EClosure();
 
-	EClosureUnmarked.push(eclosureBegin);
+	EClosureQ.push(eclosureBegin);
+	EClosureEverInQ.insert(eclosureBegin);
 
-	while(EClosureUnmarked.size() > 0)
+	while(EClosureQ.size() > 0)
 	{
-		EClosure T = EClosureUnmarked.front();
-		EClosureUnmarked.pop();
+		EClosure T = EClosureQ.front();
+		EClosureQ.pop();
 
-		EClosureMarked.insert(T);
+		Move[T] = map<char, EClosure>();
 
 		map<char, set<SNfaState *>> transitions;
 
@@ -297,9 +298,10 @@ SDfaState * DfaFromNfa(SNfaState * pNfasBegin, SNfaState * pNfasEnd)
 				}
 			}
 
-			if(EClosureMarked.count(S) == 0)
+			if(EClosureEverInQ.count(S) == 0)
 			{
-				EClosureUnmarked.push(S);
+				EClosureQ.push(S);
+				EClosureEverInQ.insert(S);
 			}
 
 			Move[T][tran.first] = S;
@@ -326,6 +328,8 @@ SDfaState * DfaFromNfa(SNfaState * pNfasBegin, SNfaState * pNfasEnd)
 	{
 		for(pair<char, EClosure> tran : move.second)
 		{
+			assert(dfass.count(move.first));
+			assert(dfass.count(tran.second));
 			dfass[move.first]->m_transitions[tran.first] = dfass[tran.second];
 		}
 	}
@@ -1092,6 +1096,8 @@ int main()
 
 		g_poolNfas.Clear();
 	}
+
+	printf("start state: %d", pDfas->m_nId);
 
 	for(SDfaState * pDfas : g_poolDfas.m_arypT)
 	{
