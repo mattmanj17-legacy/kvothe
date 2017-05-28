@@ -1,19 +1,22 @@
-#include <stdio.h>
-#include <ctype.h>
-#include <vector>
-#include <string>
-#include <stdio.h>
 #include <assert.h>
+#include <ctype.h>
+#include <stdio.h>
+
+#include <vector>
 #include <queue>
-#include <set>
-#include <map>
+#include <unordered_set>
+#include <unordered_map>
+#include <string>
+
+#include "bitary.h"
+#include "macros.h"
 
 using std::vector;
-using std::string;
 using std::queue;
-using std::set;
-using std::map;
+using std::unordered_set;
+using std::unordered_map;
 using std::pair;
+using std::string;
 
 template<typename T>
 struct Pool
@@ -25,6 +28,11 @@ struct Pool
 		m_arypT.push_back(pT);
 
 		return pT;
+	}
+
+	~Pool()
+	{
+		Clear();
 	}
 
 	void Clear()
@@ -40,33 +48,38 @@ struct Pool
 	vector<T*> m_arypT;
 };
 
+struct SNfaState;
+
+SNfaState * nfasEmpty;
+
 struct SNfaState
-{
-	static int s_nIdNext;
-	int m_nId;
-	
+{	
 	SNfaState()
+	: m_aryEpsilon()
+	, m_transitions()
+	, m_fBaked(false)
+	, m_eclosure()
+	, m_nId(-1)
 	{
-		m_nId = s_nIdNext++;
+		memset(m_transitions, 0, DIM(m_transitions) * sizeof(SNfaState *));
 	}
 
 	void PrintDebug()
 	{
 		printf("\n");
 		printf("state %d:\n", m_nId);
-		
-		if(m_transitions.size() > 0)
-		{
-			printf("transitions:");
+	
+		printf("transitions:");
 
-			for(pair<unsigned char, SNfaState*> transition : m_transitions)
+		for(size_t iChr = 0; iChr < DIM(m_transitions); ++iChr)
+		{
+			if(m_transitions[iChr])
 			{
-				assert(transition.second);
 				printf(" ");
-				printf("%d '%c' -> %d", transition.first, transition.first, transition.second->m_nId);
+				printf("%d '%c' -> %d", iChr, iChr, m_transitions[iChr]->m_nId);
 			}
-			printf("\n");
 		}
+		printf("\n");
 
 		if(m_aryEpsilon.size() > 0)
 		{
@@ -80,7 +93,7 @@ struct SNfaState
 		}
 	}
 
-	void AddTransition(unsigned char chr, SNfaState * pNfas)
+	void AddTransition(u8 chr, SNfaState * pNfas)
 	{
 		m_transitions[chr] = pNfas;
 	}
@@ -100,11 +113,11 @@ struct SNfaState
 			}
 		}
 
-		for(pair<unsigned char, SNfaState*> transition : m_transitions)
+		for(size_t iChr = 0; iChr < DIM(m_transitions); ++iChr)
 		{
-			if(!transition.second)
+			if(m_transitions[iChr] == nfasEmpty)
 			{
-				m_transitions[transition.first] = pNfas;
+				m_transitions[iChr] = pNfas;
 			}
 		}
 	}
@@ -119,63 +132,65 @@ struct SNfaState
 				return true;
 		}
 
-		for(pair<unsigned char, SNfaState*> transition : m_transitions)
+		for(size_t iChr = 0; iChr < DIM(m_transitions); ++iChr)
 		{
-			if(!transition.second)
+			if(m_transitions[iChr] == nfasEmpty)
 				return true;
 		}
 
 		return false;
 	}
 
-	set<SNfaState*> EClosure()
+	void Bake(int cState)
 	{
-		if(!feclosecalced)
-		{
-			feclosecalced = true;
-
-			// breadth first search for nodes we can reach by 0 or more epsilon transitions
+		assert(!m_fBaked);
 		
-			queue<SNfaState*> qpNfas;
-			qpNfas.push(this);
+		m_fBaked = true;
 
-			while(qpNfas.size() > 0)
+		m_eclosure.SetSize(cState);
+
+		// breadth first search for nodes we can reach by 0 or more epsilon transitions
+		
+		queue<SNfaState*> qpNfas;
+		qpNfas.push(this);
+
+		while(qpNfas.size() > 0)
+		{
+			SNfaState* pNfas = qpNfas.front();
+			qpNfas.pop();
+
+			if(!m_eclosure.At(pNfas->m_nId))
 			{
-				SNfaState* pNfas = qpNfas.front();
-				qpNfas.pop();
-
-				if(m_eclosure.find(pNfas) == m_eclosure.end())
+				m_eclosure.Set(pNfas->m_nId);
+			
+				for(SNfaState* pStateEpsilon : pNfas->m_aryEpsilon)
 				{
-					m_eclosure.insert(pNfas);
-				
-					for(SNfaState* pStateEpsilon : pNfas->m_aryEpsilon)
-					{
-						qpNfas.push(pStateEpsilon);
-					}
+					qpNfas.push(pStateEpsilon);
 				}
 			}
 		}
+	}
 
-		return m_eclosure;
+	CDynBitAry * EClosure()
+	{
+		assert(m_fBaked);
+		
+		return &m_eclosure;
 	}
 
 	vector<SNfaState*> m_aryEpsilon;
-	map<unsigned char, SNfaState*> m_transitions;
-
-
-	bool feclosecalced = false;
-	set<SNfaState*> m_eclosure;
+	SNfaState* m_transitions [256];
+	bool m_fBaked;
+	CDynBitAry m_eclosure;
+	int m_nId;
 };
-int SNfaState::s_nIdNext = 0;
 
-Pool<SNfaState> g_poolNfas;
-
-struct SNfa
+struct SNfaFragment
 {
 	SNfaState * m_pStateBegin;
 	vector<SNfaState *> m_aryUnpatched;
 
-	void Patch(SNfa nfa)
+	void Patch(SNfaFragment nfa)
 	{
 		for(SNfaState * Nfas : m_aryUnpatched)
 		{
@@ -198,17 +213,64 @@ struct SNfa
 		}
 	}
 
-	SNfa()
+	SNfaFragment()
 	: m_pStateBegin(nullptr)
 	, m_aryUnpatched()
 	{
 	}
 
-	SNfa(SNfaState * pNfas, vector<SNfaState *> aryUnpatched)
+	SNfaFragment(SNfaState * pNfas, vector<SNfaState *> aryUnpatched)
 	: m_pStateBegin(pNfas)
 	, m_aryUnpatched(aryUnpatched)
 	{
 	}
+};
+
+struct SNfaBuilder
+{	
+	SNfaState * PNfasCreate()
+	{
+		SNfaState * pNfas = m_poolNfas.PTNew<SNfaState>();
+
+		pNfas->m_nId = m_poolNfas.m_arypT.size() - 1;
+
+		return pNfas;
+	}
+
+	void Bake()
+	{
+		for(SNfaState * pNfas : m_poolNfas.m_arypT)
+		{
+			pNfas->Bake(m_poolNfas.m_arypT.size());
+		}
+	}
+
+	SNfaState * PNfasFromId(int nId)
+	{
+		return m_poolNfas.m_arypT[nId];
+	}
+
+	CDynBitAry * PBAryCreate()
+	{
+		CDynBitAry * pBary = m_poolBary.PTNew<CDynBitAry>();
+		pBary->SetSize(m_poolNfas.m_arypT.size());
+		return pBary;
+	}
+
+	CDynBitAry * PBAryCreateUnpooled()
+	{
+		CDynBitAry * pBary = new CDynBitAry();
+		pBary->SetSize(m_poolNfas.m_arypT.size());
+		return pBary;
+	}
+
+	void AddToPool(CDynBitAry * pBary)
+	{
+		m_poolBary.m_arypT.push_back(pBary);
+	}
+
+	Pool<CDynBitAry> m_poolBary;
+	Pool<SNfaState> m_poolNfas;
 };
 
 struct SDfaState // tag = dfas
@@ -231,7 +293,7 @@ struct SDfaState // tag = dfas
 		{
 			printf("transitions:\n");
 
-			for(pair<unsigned char, SDfaState*> transition : m_transitions)
+			for(pair<u8, SDfaState*> transition : m_transitions)
 			{
 				assert(transition.second);
 				printf("%d '%c' -> %d", transition.first, transition.first, transition.second->m_nId);
@@ -240,7 +302,7 @@ struct SDfaState // tag = dfas
 		}
 	}
 
-	map<unsigned char, SDfaState *> m_transitions;
+	unordered_map<u8, SDfaState *> m_transitions;
 	static int s_nIdNext;
 	int m_nId;
 	bool m_fIsFinal = false;
@@ -249,60 +311,76 @@ int SDfaState::s_nIdNext = 0;
 
 Pool<SDfaState> g_poolDfas;
 
-set<SNfaState *> EClosureForStates(vector<SNfaState *> aryStates)
+struct NHashPDynBitAry
 {
-	set<SNfaState *> eclosure;
-
-	for(SNfaState * pNfas : aryStates)
+	size_t operator()(CDynBitAry * const tohash) const
 	{
-		for(SNfaState * pNfasEpsilon : pNfas->EClosure())
-		{
-			eclosure.insert(pNfasEpsilon);
-		}
+		return tohash->Hash();
 	}
+};
 
-	return eclosure;
-}
-
-SDfaState * DfaFromNfa(SNfaState * pNfasBegin, SNfaState * pNfasEnd)
+struct NEqualsPDynBitAry
 {
-	typedef set<SNfaState *> EClosure;
-	
-	queue<EClosure> EClosureQ;
-	set<EClosure> EClosureEverInQ;
-	map<EClosure, map<char, EClosure>> Move;
+	bool operator()( CDynBitAry * const lhs, CDynBitAry * const rhs ) const
+	{
+		return lhs->FEquals(rhs);
+	}
+};
 
-	EClosure eclosureBegin = pNfasBegin->EClosure();
+SDfaState * DfaFromNfa(SNfaBuilder * pBuilder, SNfaState * pNfasBegin, SNfaState * pNfasEnd)
+{
+	queue<CDynBitAry *> EClosureQ;
+	unordered_set<CDynBitAry *, NHashPDynBitAry, NEqualsPDynBitAry> EClosureEverInQ;
+	unordered_map<CDynBitAry *, unordered_map<u8, CDynBitAry *>, NHashPDynBitAry, NEqualsPDynBitAry> Move;
+
+	CDynBitAry * eclosureBegin = pNfasBegin->EClosure();
 
 	EClosureQ.push(eclosureBegin);
 	EClosureEverInQ.insert(eclosureBegin);
 
 	while(EClosureQ.size() > 0)
 	{
-		EClosure T = EClosureQ.front();
+		CDynBitAry * T = EClosureQ.front();
 		EClosureQ.pop();
 
-		Move[T] = map<char, EClosure>();
+		Move[T] = unordered_map<u8, CDynBitAry *>();
 
-		map<char, set<SNfaState *>> transitions;
+		unordered_map<u8, CDynBitAry *> transitions;
 
-		for(SNfaState * pNfas : T)
+		for(size_t iBit = 0; iBit < T->C(); ++iBit)
 		{
-			for(pair<char, SNfaState *> tran : pNfas->m_transitions)
+			if(T->At(iBit))
 			{
-				transitions[tran.first].insert(tran.second);
+				SNfaState * pNfas = pBuilder->PNfasFromId(iBit);
+
+				for(size_t iChr = 0; iChr < DIM(pNfas->m_transitions); ++iChr)
+				{
+					assert(pNfas->m_transitions[iChr] != nfasEmpty);
+
+					if(pNfas->m_transitions[iChr])
+					{
+						if(transitions.count(iChr) == 0)
+						{
+							transitions[iChr] = pBuilder->PBAryCreate();
+						}
+					
+						transitions[iChr]->Set(pNfas->m_transitions[iChr]->m_nId);
+					}
+				}
 			}
 		}
 
-		for(pair<char, set<SNfaState *>> tran : transitions)
+		for(pair<u8, CDynBitAry *> tran : transitions)
 		{
-			EClosure S;
-
-			for(SNfaState * pNfasTran : tran.second)
+			CDynBitAry * S = pBuilder->PBAryCreateUnpooled();
+			
+			for(size_t iBit = 0; iBit < tran.second->C(); ++ iBit)
 			{
-				for(SNfaState * pNfasE : pNfasTran->EClosure())
+				if(tran.second->At(iBit))
 				{
-					S.insert(pNfasE);
+					SNfaState * pNfasTran = pBuilder->PNfasFromId(iBit);
+
+					S->Union(pNfasTran->EClosure());
 				}
 			}
 
@@ -310,31 +388,45 @@ SDfaState * DfaFromNfa(SNfaState * pNfasBegin, SNfaState * pNfasEnd)
 			{
 				EClosureQ.push(S);
 				EClosureEverInQ.insert(S);
+				pBuilder->AddToPool(S);
+			}
+			else
+			{
+				CDynBitAry * SOld = S;
+				S = *EClosureEverInQ.find(SOld);
+				delete SOld;
 			}
 
 			Move[T][tran.first] = S;
 		}
 	}
 
-	map<EClosure, SDfaState *> dfass;
+	unordered_map<CDynBitAry *, SDfaState *, NHashPDynBitAry, NEqualsPDynBitAry> dfass;
 
-	for(pair<EClosure, map<char, EClosure>> move : Move)
+	for(pair<CDynBitAry *, unordered_map<u8, CDynBitAry *>> move : Move)
 	{
 		dfass[move.first] = g_poolDfas.PTNew<SDfaState>();
 
-		for(SNfaState * pNfas : move.first)
+		CDynBitAry * eclosure = move.first;
+
+		for(size_t iBit = 0; iBit < eclosure->C(); ++iBit)
 		{
-			if(pNfas == pNfasEnd)
+			if(eclosure->At(iBit))
 			{
-				dfass[move.first]->m_fIsFinal = true;
-				break;
+				SNfaState * pNfas = pBuilder->PNfasFromId(iBit);
+
+				if(pNfas == pNfasEnd)
+				{
+					dfass[move.first]->m_fIsFinal = true;
+					break;
+				}
 			}
 		}
 	}
 
-	for(pair<EClosure, map<char, EClosure>> move : Move)
+	for(pair<CDynBitAry *, unordered_map<u8, CDynBitAry *>> move : Move)
 	{
-		for(pair<char, EClosure> tran : move.second)
+		for(pair<u8, CDynBitAry *> tran : move.second)
 		{
 			assert(dfass.count(move.first));
 			assert(dfass.count(tran.second));
@@ -351,7 +443,7 @@ struct SRegex // tag = regex
 
 	virtual ~SRegex(){};
 
-	virtual SNfa NfaCreate() = 0;
+	virtual SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) = 0;
 };
 
 struct SRegexList : public SRegex // tag = regexlist
@@ -374,22 +466,22 @@ struct SUnion : public SRegexList // tag = union
 		printf(")");
 	}
 
-	SNfa NfaCreate() override
+	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
 	{
 		assert(m_arypRegex.size() > 0);
 
-		SNfaState * pNfasOr = g_poolNfas.PTNew<SNfaState>();
+		SNfaState * pNfasOr = pBuilder->PNfasCreate();
 
 		vector<SNfaState *> aryUnpatched;
 
 		for(SRegex * pRegex : m_arypRegex)
 		{
-			SNfa nfaAlt = pRegex->NfaCreate();
+			SNfaFragment nfaAlt = pRegex->NfafragCreate(pBuilder);
 			aryUnpatched.insert(aryUnpatched.end(), nfaAlt.m_aryUnpatched.begin(), nfaAlt.m_aryUnpatched.end());
 			pNfasOr->AddEpsilon(nfaAlt.m_pStateBegin);
 		}
 
-		return SNfa(pNfasOr, aryUnpatched);
+		return SNfaFragment(pNfasOr, aryUnpatched);
 	}
 };
 
@@ -408,15 +500,15 @@ struct SConcatination : public SRegexList // tag = concat
 		printf(")");
 	}
 
-	SNfa NfaCreate() override
+	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
 	{
 		assert(m_arypRegex.size() > 0);
 
-		SNfa nfa = m_arypRegex[0]->NfaCreate();
+		SNfaFragment nfa = m_arypRegex[0]->NfafragCreate(pBuilder);
 
 		for(size_t i = 1; i < m_arypRegex.size(); ++i)
 		{
-			nfa.Patch(m_arypRegex[i]->NfaCreate());
+			nfa.Patch(m_arypRegex[i]->NfafragCreate(pBuilder));
 		}
 
 		return nfa;
@@ -438,7 +530,7 @@ struct SQuantifier : public SRegex // tag = quant
 		printf(")");
 	}
 
-	SNfa NfaCreateCount(int c)
+	SNfaFragment NfaCreateCount(SNfaBuilder * pBuilder, int c)
 	{
 		SConcatination concat;
 
@@ -447,22 +539,22 @@ struct SQuantifier : public SRegex // tag = quant
 			concat.m_arypRegex.push_back(m_pRegex);
 		}
 
-		return concat.NfaCreate();
+		return concat.NfafragCreate(pBuilder);
 	}
 
-	SNfa NfaCreateStar()
+	SNfaFragment NfaCreateStar(SNfaBuilder * pBuilder)
 	{
 		// create a ?
 		
-		SNfaState * pNfasOr = g_poolNfas.PTNew<SNfaState>();
-		SNfa nfa = m_pRegex->NfaCreate();
+		SNfaState * pNfasOr = pBuilder->PNfasCreate();
+		SNfaFragment nfa = m_pRegex->NfafragCreate(pBuilder);
 		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
 		pNfasOr->AddEpsilon(nullptr);
 
 		// the final nfa will only have one unpatched node, the starting node, 
 		// because the nfa created from m_pregex is patched back to pOrState
 
-		SNfa nfaStar(pNfasOr, { pNfasOr });
+		SNfaFragment nfaStar(pNfasOr, { pNfasOr });
 
 		// loop back the nfa created from m_pregex to pOrState
 		// turning a ? into a *
@@ -472,12 +564,12 @@ struct SQuantifier : public SRegex // tag = quant
 		return nfaStar;
 	}
 
-	SNfa NfaCreateQMark()
+	SNfaFragment NfaCreateQMark(SNfaBuilder * pBuilder)
 	{
 		// create a ?
 		
-		SNfaState * pNfasOr = g_poolNfas.PTNew<SNfaState>();
-		SNfa nfa = m_pRegex->NfaCreate();
+		SNfaState * pNfasOr = pBuilder->PNfasCreate();
+		SNfaFragment nfa = m_pRegex->NfafragCreate(pBuilder);
 		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
 		pNfasOr->AddEpsilon(nullptr);
 
@@ -488,21 +580,21 @@ struct SQuantifier : public SRegex // tag = quant
 		aryUnpatched.push_back(pNfasOr);
 		aryUnpatched.insert(aryUnpatched.end(), nfa.m_aryUnpatched.begin(), nfa.m_aryUnpatched.end());
 
-		return SNfa(pNfasOr, aryUnpatched);
+		return SNfaFragment(pNfasOr, aryUnpatched);
 	}
 
-	SNfa NfaCreateCountOptional(int c)
+	SNfaFragment NfaCreateCountOptional(SNfaBuilder * pBuilder, int c)
 	{
 		assert(c > 0);
 
 		// create nested ?'s, starting on the right and working
 		// back to the left to the starting node
 		
-		SNfa nfaLeftMost;
+		SNfaFragment nfaLeftMost;
 
 		for(int iC = c; iC > 0; --iC)
 		{
-			SNfa nfaQMark = NfaCreateQMark();
+			SNfaFragment nfaQMark = NfaCreateQMark(pBuilder);
 
 			if(nfaLeftMost.m_pStateBegin)
 			{
@@ -515,24 +607,24 @@ struct SQuantifier : public SRegex // tag = quant
 		return nfaLeftMost;
 	}
 
-	SNfa NfaCreate() override
+	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
 	{
-		SNfa nfa;
+		SNfaFragment nfa;
 
 		if(m_cMic > 0)
 		{
-			nfa = NfaCreateCount(m_cMic);
+			nfa = NfaCreateCount(pBuilder, m_cMic);
 		}
 
 		if(m_cMac == -1)
 		{
 			if(nfa.m_pStateBegin)
 			{
-				nfa.Patch(NfaCreateStar());
+				nfa.Patch(NfaCreateStar(pBuilder));
 			}
 			else
 			{
-				nfa = NfaCreateStar();
+				nfa = NfaCreateStar(pBuilder);
 			}
 
 			return nfa;
@@ -546,11 +638,11 @@ struct SQuantifier : public SRegex // tag = quant
 
 		if(nfa.m_pStateBegin)
 		{
-			nfa.Patch(NfaCreateCountOptional(m_cMac - m_cMic));
+			nfa.Patch(NfaCreateCountOptional(pBuilder, m_cMac - m_cMic));
 		}
 		else
 		{
-			nfa = NfaCreateCountOptional(m_cMac - m_cMic);
+			nfa = NfaCreateCountOptional(pBuilder, m_cMac - m_cMic);
 		}
 
 		return nfa;
@@ -559,45 +651,45 @@ struct SQuantifier : public SRegex // tag = quant
 
 struct SRange : SRegex // tag = range
 {
-	unsigned char m_chrMic;
-	unsigned char m_chrMac;
+	u8 m_chrMic;
+	u8 m_chrMac;
 
 	void PrintDebug() override
 	{
 		printf("(%d '%c' - %d '%c')", m_chrMic, m_chrMic, m_chrMac, m_chrMac);
 	}
 
-	SNfa NfaCreate() override
+	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
 	{
-		SNfaState * pNfasOr = g_poolNfas.PTNew<SNfaState>();
+		SNfaState * pNfasOr = pBuilder->PNfasCreate();
 
 		for(int iChr = m_chrMic; iChr <= m_chrMac; ++iChr)
 		{
-			SNfaState * pNfasChr = g_poolNfas.PTNew<SNfaState>();
-			pNfasChr->AddTransition(iChr, nullptr);
+			SNfaState * pNfasChr = pBuilder->PNfasCreate();
+			pNfasChr->AddTransition(iChr, nfasEmpty);
 
 			pNfasOr->AddEpsilon(pNfasChr);
 		}
 
-		return SNfa(pNfasOr, pNfasOr->m_aryEpsilon);
+		return SNfaFragment(pNfasOr, pNfasOr->m_aryEpsilon);
 	}
 };
 
 struct SRegexChar : SRegex // tag = regexchr
 {
-	unsigned char m_chr;
+	u8 m_chr;
 
 	void PrintDebug() override
 	{
 		printf("%d '%c'", m_chr, m_chr);
 	}
 
-	SNfa NfaCreate() override
+	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
 	{
-		SNfaState * pNfasChr = g_poolNfas.PTNew<SNfaState>();
-		pNfasChr->AddTransition(m_chr, nullptr);
+		SNfaState * pNfasChr = pBuilder->PNfasCreate();
+		pNfasChr->AddTransition(m_chr, nfasEmpty);
 
-		return SNfa(pNfasChr, { pNfasChr });
+		return SNfaFragment(pNfasChr, { pNfasChr });
 	}
 };
 
@@ -650,7 +742,7 @@ struct SParser
 		return pConcat;
 	}
 
-	bool FChrCanBeginAtom(unsigned char chr)
+	bool FChrCanBeginAtom(u8 chr)
 	{
 		return 
 			ChrCur() != ')' &&
@@ -802,9 +894,9 @@ struct SParser
 		return pRegexCur;
 	}
 
-	unsigned char ChrConsumeHex()
+	u8 ChrConsumeHex()
 	{
-		unsigned char chrHex = ChrConsume();
+		u8 chrHex = ChrConsume();
 
 		assert(
 			(chrHex >= '0' && chrHex <= '9') ||
@@ -815,9 +907,9 @@ struct SParser
 		return chrHex;
 	}
 
-	unsigned char ChrEscaped()
+	u8 ChrEscaped()
 	{
-		unsigned char chrEscape = ChrConsume();
+		u8 chrEscape = ChrConsume();
 
 		if(chrEscape == 'a')		return '\a';
 		else if(chrEscape == 'b')	return '\b';
@@ -832,7 +924,7 @@ struct SParser
 			// \cA control character
 			
 			assert(isalpha(ChrCur()));
-			unsigned char chr = tolower(ChrConsume());
+			u8 chr = tolower(ChrConsume());
 			return chr - 'a' + 1;
 		}
 		else if(chrEscape == 'x')
@@ -844,7 +936,7 @@ struct SParser
 			strHex += ChrConsumeHex();
 			strHex += ChrConsumeHex();
 			
-			return (unsigned char) strtol(strHex.c_str(), nullptr, 16);
+			return (u8) strtol(strHex.c_str(), nullptr, 16);
 		}
 		else if(isdigit(chrEscape))
 		{
@@ -861,7 +953,7 @@ struct SParser
 				++cDigit;
 			}
 
-			return (unsigned char) strtol(strOctal.c_str(), nullptr, 8);
+			return (u8) strtol(strOctal.c_str(), nullptr, 8);
 		}
 		else
 		{
@@ -933,7 +1025,7 @@ struct SParser
 			!iscntrl(ChrCur());
 	}
 
-	unsigned char ChrConsumeSet()
+	u8 ChrConsumeSet()
 	{
 		assert(FChrIsValidSetChrStart());
 		
@@ -975,8 +1067,8 @@ struct SParser
 		assert(FChrIsValidSetChrStart());
 		while(FChrIsValidSetChrStart())
 		{
-			unsigned char chrBegin = ChrConsumeSet();
-			unsigned char chrEnd = chrBegin;
+			u8 chrBegin = ChrConsumeSet();
+			u8 chrEnd = chrBegin;
 
 			if(ChrCur() == '-')
 			{
@@ -1003,7 +1095,7 @@ struct SParser
 			{
 				// save the current chr, which is the begining or a range
 
-				unsigned char chrBegin = iChr;
+				u8 chrBegin = iChr;
 
 				// advance to the end of the range
 				
@@ -1037,20 +1129,20 @@ struct SParser
 		return pUnion;
 	}
 	
-	unsigned char ChrCur()
+	u8 ChrCur()
 	{
 		return m_chrCur;
 	}
 
-	unsigned char ChrConsume()
+	u8 ChrConsume()
 	{
-		unsigned char chrPrev = m_chrCur;
-		m_chrCur = (unsigned char)fgetc(m_pFile);
+		u8 chrPrev = m_chrCur;
+		m_chrCur = (u8)fgetc(m_pFile);
 
 		return chrPrev;
 	}
 
-	void MatchChr(char chrMatch)
+	void MatchChr(u8 chrMatch)
 	{
 		assert(ChrCur() == chrMatch);
 
@@ -1064,16 +1156,21 @@ struct SParser
 		(void) ChrConsume();
 	}
 
-	unsigned char	m_chrCur;
+	u8	m_chrCur;
 	FILE *			m_pFile;
 };
 
 int main()
 {
+	SNfaState s;
+	nfasEmpty = &s;
+	
 	SDfaState * pDfas = nullptr;
 	
+	SNfaBuilder nfaBuilder;
+
 	{
-		SNfa nfa;
+		SNfaFragment nfa;
 	
 		{
 			const char * pChzFileName = "example.regex";
@@ -1088,23 +1185,20 @@ int main()
 
 			fclose(pFile);
 
-			nfa = pRegex->NfaCreate();
+			nfa = pRegex->NfafragCreate(&nfaBuilder);
 
 			// dont need the regex anymore
 		
 			g_poolRegex.Clear();
 		}
 
-		SNfaState stateAccept;
-		stateAccept.m_nId = -1; // for debugging
+		SNfaState * pStateAccept = nfaBuilder.PNfasCreate();
 
-		nfa.Patch(SNfa(&stateAccept, {}));
+		nfa.Patch(SNfaFragment(pStateAccept, {}));
 
-		pDfas = DfaFromNfa(nfa.m_pStateBegin, &stateAccept);
+		nfaBuilder.Bake();
 
-		// dont need the nfa anymore
-
-		g_poolNfas.Clear();
+		pDfas = DfaFromNfa(&nfaBuilder, nfa.m_pStateBegin, pStateAccept);
 	}
 
 	//printf("start state: %d", pDfas->m_nId);

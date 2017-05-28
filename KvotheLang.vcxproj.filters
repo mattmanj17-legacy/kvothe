@@ -21,9 +21,21 @@
     <ClCompile Include="KvotheLang\regex.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="KvotheLang\murmurhash.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="KvotheLang\macros.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KvotheLang\bitary.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KvotheLang\types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KvotheLang\murmurhash.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
