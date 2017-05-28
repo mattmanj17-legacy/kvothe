@@ -130,33 +130,41 @@ struct SNfaState
 
 	set<SNfaState*> EClosure()
 	{
-		// breadth first search for nodes we can reach by 0 or more epsilon transitions
-		
-		set<SNfaState*> eclosure;
-		queue<SNfaState*> qpNfas;
-		qpNfas.push(this);
-
-		while(qpNfas.size() > 0)
+		if(!feclosecalced)
 		{
-			SNfaState* pNfas = qpNfas.front();
-			qpNfas.pop();
+			feclosecalced = true;
 
-			if(eclosure.find(pNfas) == eclosure.end())
+			// breadth first search for nodes we can reach by 0 or more epsilon transitions
+		
+			queue<SNfaState*> qpNfas;
+			qpNfas.push(this);
+
+			while(qpNfas.size() > 0)
 			{
-				eclosure.insert(pNfas);
-				
-				for(SNfaState* pStateEpsilon : pNfas->m_aryEpsilon)
+				SNfaState* pNfas = qpNfas.front();
+				qpNfas.pop();
+
+				if(m_eclosure.find(pNfas) == m_eclosure.end())
 				{
-					qpNfas.push(pStateEpsilon);
+					m_eclosure.insert(pNfas);
+				
+					for(SNfaState* pStateEpsilon : pNfas->m_aryEpsilon)
+					{
+						qpNfas.push(pStateEpsilon);
+					}
 				}
 			}
 		}
 
-		return eclosure;
+		return m_eclosure;
 	}
 
 	vector<SNfaState*> m_aryEpsilon;
 	map<unsigned char, SNfaState*> m_transitions;
+
+
+	bool feclosecalced = false;
+	set<SNfaState*> m_eclosure;
 };
 int SNfaState::s_nIdNext = 0;
 
@@ -1062,21 +1070,23 @@ struct SParser
 
 int main()
 {
-	const char * pChzFileName = "example.regex";
-
-	FILE * pFile = fopen(pChzFileName, "r");
-
-	SParser parser;
-
-	parser.SetInput(pFile);
-
 	SDfaState * pDfas = nullptr;
 	
 	{
 		SNfa nfa;
 	
 		{
+			const char * pChzFileName = "example.regex";
+
+			FILE * pFile = fopen(pChzFileName, "r");
+			
+			SParser parser;
+
+			parser.SetInput(pFile);
+			
 			SRegex * pRegex = parser.RegexFileParse();
+
+			fclose(pFile);
 
 			nfa = pRegex->NfaCreate();
 
@@ -1097,16 +1107,16 @@ int main()
 		g_poolNfas.Clear();
 	}
 
-	printf("start state: %d", pDfas->m_nId);
+	//printf("start state: %d", pDfas->m_nId);
 
-	for(SDfaState * pDfas : g_poolDfas.m_arypT)
-	{
-		printf("\n");
-		pDfas->PrintDebug();
-		printf("\n");
-	}
+	//for(SDfaState * pDfas : g_poolDfas.m_arypT)
+	//{
+		//printf("\n");
+		//pDfas->PrintDebug();
+		//printf("\n");
+	//}
 
-	g_poolDfas.Clear();
+	//g_poolDfas.Clear();
 
 	return 0;
 }
