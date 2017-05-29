@@ -20,15 +20,13 @@ int main()
 
 			FILE * pFile = fopen(pChzFileName, "r");
 			
-			SParser parser;
-
-			parser.SetInput(pFile);
+			CRegexParser parser;
 			
-			SRegex * pRegex = parser.RegexFileParse();
+			parser.ParseFile(pFile);
 
 			fclose(pFile);
 
-			nfa =  nfaBuilder.NfafragFromRegex(pRegex);
+			nfa =  nfaBuilder.NfafragFromRegex(parser.PRegexAstParsed());
 		}
 
 		SNfaState * pStateAccept = nfaBuilder.PNfasCreate();
