@@ -11,105 +11,100 @@ using std::vector;
 #include "types.h"
 #include "pool.h"
 
+struct SUnionData;
+struct SConcatinationData;
+struct SQuantifierData;
+struct SRangeData;
+struct SRegexCharData;
+
+enum REGEXK
+{
+	REGEXK_Union,
+	REGEXK_Concat,
+	REGEXK_Quant,
+	REGEXK_Range,
+	REGEXK_Chr,
+};
+
+struct SRegex // tag = regex
+{
+	void PrintDebug() {}
+	REGEXK m_regexk;
+
+	union
+	{
+		SUnionData * m_pUnion;
+		SConcatinationData * m_pConcat;
+		SQuantifierData * m_pQuant;
+		SRangeData * m_pRange;
+		SRegexCharData * m_pChr;
+	};
+};
+
+struct SUnionData // tag = union
+{
+	vector<SRegex *> m_arypRegex;
+	
+	void PrintDebug();
+};
+
+struct SConcatinationData // tag = concat
+{
+	vector<SRegex *> m_arypRegex;
+	
+	void PrintDebug()
+	{
+		printf("(CONCAT");
+
+		for(SRegex * pRegex : m_arypRegex)
+		{
+			printf(" ");
+			pRegex->PrintDebug();
+		}
+
+		printf(")");
+	}
+};
+
+struct SQuantifierData
+{
+	int m_cMic;
+	int m_cMac;
+	SRegex * m_pRegex;
+
+	void PrintDebug()
+	{
+		printf("({%d, %d} ", m_cMic, m_cMac);
+
+		m_pRegex->PrintDebug();
+
+		printf(")");
+	}
+};
+
+struct SRangeData
+{
+	u8 m_chrMic;
+	u8 m_chrMac;
+
+	void PrintDebug()
+	{
+		printf("(%d '%c' - %d '%c')", m_chrMic, m_chrMic, m_chrMac, m_chrMac);
+	}	
+};
+
+struct SRegexCharData
+{
+	u8 m_chr;
+
+	void PrintDebug()
+	{
+		printf("%d '%c'", m_chr, m_chr);
+	}	
+};
+
 struct SParser
 {
-	enum REGEXK
-	{
-		REGEXK_Union,
-		REGEXK_Concat,
-		REGEXK_Quant,
-		REGEXK_Range,
-		REGEXK_Chr,
-	};
-	
-	struct SRegex // tag = regex
-	{
-		void PrintDebug() {}
-		REGEXK m_regexk;
-
-		struct SUnionData // tag = union
-		{
-			vector<SRegex *> m_arypRegex;
-			
-			void PrintDebug()
-			{
-				printf("(UNION");
-
-				for(SRegex * pRegex : m_arypRegex)
-				{
-					printf(" ");
-					pRegex->PrintDebug();
-				}
-
-				printf(")");
-			}
-		};
-	
-		struct SConcatinationData // tag = concat
-		{
-			vector<SRegex *> m_arypRegex;
-			
-			void PrintDebug()
-			{
-				printf("(CONCAT");
-	
-				for(SRegex * pRegex : m_arypRegex)
-				{
-					printf(" ");
-					pRegex->PrintDebug();
-				}
-	
-				printf(")");
-			}
-		};
-	
-		struct SQuantifierData
-		{
-			int m_cMic;
-			int m_cMac;
-			SRegex * m_pRegex;
-	
-			void PrintDebug()
-			{
-				printf("({%d, %d} ", m_cMic, m_cMac);
-	
-				m_pRegex->PrintDebug();
-	
-				printf(")");
-			}
-		};
-	
-		struct SRangeData
-		{
-			u8 m_chrMic;
-			u8 m_chrMac;
-	
-			void PrintDebug()
-			{
-				printf("(%d '%c' - %d '%c')", m_chrMic, m_chrMic, m_chrMac, m_chrMac);
-			}	
-		};
-	
-		struct SRegexCharData
-		{
-			u8 m_chr;
-	
-			void PrintDebug()
-			{
-				printf("%d '%c'", m_chr, m_chr);
-			}	
-		};
-
-		union
-		{
-			SUnionData * m_pUnion;
-			SConcatinationData * m_pConcat;
-			SQuantifierData * m_pQuant;
-			SRangeData * m_pRange;
-			SRegexCharData * m_pChr;
-		};
-	};
-	
 	SRegex * RegexFileParse()
 	{
 		SRegex * pRegex = RegexParse();
@@ -139,7 +134,7 @@ struct SParser
 		if(ChrCur() == '|')
 		{
 			SRegex * pRegex = PRegexCreate(REGEXK_Union);
-			SRegex::SUnionData * pUnion = pRegex->m_pUnion;
+			SUnionData * pUnion = pRegex->m_pUnion;
 			pUnion->m_arypRegex.push_back(pConcat);
 			
 			while(ChrCur() == '|')
@@ -179,7 +174,7 @@ struct SParser
 		if(FChrCanBeginAtom(ChrCur()))
 		{
 			SRegex * pRegex = PRegexCreate(REGEXK_Concat);
-			SRegex::SConcatinationData * pConcat = pRegex->m_pConcat;
+			SConcatinationData * pConcat = pRegex->m_pConcat;
 			pConcat->m_arypRegex.push_back(pQuant);
 			
 			while(FChrCanBeginAtom(ChrCur()))
@@ -209,7 +204,7 @@ struct SParser
 		return atoi(strNum.c_str());
 	}
 
-	void ParseInitQuantExplicit(SRegex::SQuantifierData * pQuant)
+	void ParseInitQuantExplicit(SQuantifierData * pQuant)
 	{
 		// handle {,} syntax
 		
@@ -252,7 +247,7 @@ struct SParser
 		MatchChr('}');
 	}
 
-	void ParseInitQuant(SRegex::SQuantifierData * pQuant)
+	void ParseInitQuant(SQuantifierData * pQuant)
 	{
 		// set cMic and cMac based on the current quantifier
 		
@@ -297,7 +292,7 @@ struct SParser
 			// make a new quantifier quantifieing the regex to the left
 			
 			SRegex * pRegex = PRegexCreate(REGEXK_Quant);
-			SRegex::SQuantifierData * pQuant = pRegex->m_pQuant;
+			SQuantifierData * pQuant = pRegex->m_pQuant;
 			pQuant->m_pRegex = pRegexCur;
 
 			ParseInitQuant(pQuant);
@@ -407,7 +402,7 @@ struct SParser
 			MatchChr('.');
 			
 			SRegex * pRegex = PRegexCreate(REGEXK_Range);
-			SRegex::SRangeData * pRange = pRegex->m_pRange;
+			SRangeData * pRange = pRegex->m_pRange;
 			pRange->m_chrMic = 0;
 			pRange->m_chrMac = 255;
 
@@ -418,7 +413,7 @@ struct SParser
 			MatchChr('\\');
 
 			SRegex * pRegex = PRegexCreate(REGEXK_Chr);
-			SRegex::SRegexCharData * pRegexchar = pRegex->m_pChr;
+			SRegexCharData * pRegexchar = pRegex->m_pChr;
 			pRegexchar->m_chr = ChrEscaped();
 
 			return pRegex;
@@ -428,7 +423,7 @@ struct SParser
 			assert(FChrCanBeginAtom(ChrCur()));
 
 			SRegex * pRegex = PRegexCreate(REGEXK_Chr);
-			SRegex::SRegexCharData * pRegexchar = pRegex->m_pChr;
+			SRegexCharData * pRegexchar = pRegex->m_pChr;
 			pRegexchar->m_chr = ChrConsume();
 
 			return pRegex;
@@ -507,7 +502,7 @@ struct SParser
 		// convert mpChrF to a union of ranges
 
 		SRegex * pRegex = PRegexCreate(REGEXK_Union);
-		SRegex::SUnionData * pUnion = pRegex->m_pUnion;
+		SUnionData * pUnion = pRegex->m_pUnion;
 		
 		for(int iChr = 0; iChr < 256; ++iChr)
 		{
@@ -529,14 +524,14 @@ struct SParser
 				if(chrBegin == iChr)
 				{
 					SRegex * pRegex = PRegexCreate(REGEXK_Chr);
-					SRegex::SRegexCharData * pRegexchar = pRegex->m_pChr;
+					SRegexCharData * pRegexchar = pRegex->m_pChr;
 					pRegexchar->m_chr = chrBegin;
 					pUnion->m_arypRegex.push_back(pRegex);
 				}
 				else
 				{
 					SRegex * pRegex = PRegexCreate(REGEXK_Range);
-					SRegex::SRangeData * pRange = pRegex->m_pRange;
+					SRangeData * pRange = pRegex->m_pRange;
 					pRange->m_chrMic = chrBegin;
 					pRange->m_chrMac = iChr;
 					pUnion->m_arypRegex.push_back(pRegex);
@@ -586,24 +581,24 @@ struct SParser
 
 		switch (regexk)
 		{
-			case SParser::REGEXK_Union:
-				pRegex->m_pUnion = m_poolRegexData.PTNew<SRegex::SUnionData>();
+			case REGEXK_Union:
+				pRegex->m_pUnion = m_poolRegexData.PTNew<SUnionData>();
 				break;
 
-			case SParser::REGEXK_Concat:
-				pRegex->m_pConcat = m_poolRegexData.PTNew<SRegex::SConcatinationData>();
+			case REGEXK_Concat:
+				pRegex->m_pConcat = m_poolRegexData.PTNew<SConcatinationData>();
 				break;
 
-			case SParser::REGEXK_Quant:
-				pRegex->m_pQuant = m_poolRegexData.PTNew<SRegex::SQuantifierData>();
+			case REGEXK_Quant:
+				pRegex->m_pQuant = m_poolRegexData.PTNew<SQuantifierData>();
 				break;
 
-			case SParser::REGEXK_Range:
-				pRegex->m_pRange = m_poolRegexData.PTNew<SRegex::SRangeData>();
+			case REGEXK_Range:
+				pRegex->m_pRange = m_poolRegexData.PTNew<SRangeData>();
 				break;
 
-			case SParser::REGEXK_Chr:
-				pRegex->m_pChr = m_poolRegexData.PTNew<SRegex::SRegexCharData>();
+			case REGEXK_Chr:
+				pRegex->m_pChr = m_poolRegexData.PTNew<SRegexCharData>();
 				break;
 
 			default:

@@ -187,27 +187,27 @@ struct SNfaFragment
 
 struct SNfaBuilder
 {	
-	SNfaFragment NfafragFromRegex(SParser::SRegex * pRegex)
+	SNfaFragment NfafragFromRegex(SRegex * pRegex)
 	{
 		switch (pRegex->m_regexk)
 		{
-			case SParser::REGEXK_Union:
+			case REGEXK_Union:
 				return NfafragFromUnion(pRegex->m_pUnion);
 				break;
 
-			case SParser::REGEXK_Concat:
+			case REGEXK_Concat:
 				return NfafragFromConcat(pRegex->m_pConcat);
 				break;
 
-			case SParser::REGEXK_Quant:
+			case REGEXK_Quant:
 				return NfafragFromQuant(pRegex->m_pQuant);
 				break;
 
-			case SParser::REGEXK_Range:
+			case REGEXK_Range:
 				return NfafragFromRange(pRegex->m_pRange);
 				break;
 
-			case SParser::REGEXK_Chr:
+			case REGEXK_Chr:
 				return NfafragFromRegexchr(pRegex->m_pChr);
 				break;
 
@@ -218,7 +218,7 @@ struct SNfaBuilder
 		}
 	}
 
-	SNfaFragment NfafragFromUnion(SParser::SRegex::SUnionData * pUnion)
+	SNfaFragment NfafragFromUnion(SUnionData * pUnion)
 	{
 		assert(pUnion->m_arypRegex.size() > 0);
 	
@@ -226,7 +226,7 @@ struct SNfaBuilder
 	
 		vector<SNfaState *> aryUnpatched;
 	
-		for(SParser::SRegex * pRegex : pUnion->m_arypRegex)
+		for(SRegex * pRegex : pUnion->m_arypRegex)
 		{
 			SNfaFragment nfaAlt = NfafragFromRegex(pRegex);
 			aryUnpatched.insert(aryUnpatched.end(), nfaAlt.m_aryUnpatched.begin(), nfaAlt.m_aryUnpatched.end());
@@ -236,7 +236,7 @@ struct SNfaBuilder
 		return SNfaFragment(pNfasOr, aryUnpatched);
 	}
 
-	SNfaFragment NfafragFromConcat(SParser::SRegex::SConcatinationData * pConcat)
+	SNfaFragment NfafragFromConcat(SConcatinationData * pConcat)
 	{
 		assert(pConcat->m_arypRegex.size() > 0);
 	
@@ -250,7 +250,7 @@ struct SNfaBuilder
 		return nfa;
 	}
 
-	SNfaFragment NfafragFromQuant(SParser::SRegex::SQuantifierData * pQuant)
+	SNfaFragment NfafragFromQuant(SQuantifierData * pQuant)
 	{
 		SNfaFragment nfa;
 	
@@ -291,7 +291,7 @@ struct SNfaBuilder
 		return nfa;
 	}
 
-	SNfaFragment NfafragFromRange(SParser::SRegex::SRangeData * pRange)
+	SNfaFragment NfafragFromRange(SRangeData * pRange)
 	{
 		SNfaState * pNfasOr = PNfasCreate();
 	
@@ -306,7 +306,7 @@ struct SNfaBuilder
 		return SNfaFragment(pNfasOr, pNfasOr->m_aryEpsilon);
 	}
 
-	SNfaFragment NfafragFromRegexchr(SParser::SRegex::SRegexCharData * pRegexchr)
+	SNfaFragment NfafragFromRegexchr(SRegexCharData * pRegexchr)
 	{
 		SNfaState * pNfasChr = PNfasCreate();
 		pNfasChr->AddTransition(pRegexchr->m_chr, nfasEmpty);
@@ -314,9 +314,9 @@ struct SNfaBuilder
 		return SNfaFragment(pNfasChr, { pNfasChr });
 	}
 
-	SNfaFragment NfaCreateCount(SParser::SRegex::SQuantifierData * pQuant, int c)
+	SNfaFragment NfaCreateCount(SQuantifierData * pQuant, int c)
 	{
-		SParser::SRegex::SConcatinationData concat;
+		SConcatinationData concat;
 	
 		for(int iC = 0; iC < c; ++ iC)
 		{
@@ -326,7 +326,7 @@ struct SNfaBuilder
 		return NfafragFromConcat(&concat);
 	}
 	
-	SNfaFragment NfaCreateStar(SParser::SRegex::SQuantifierData * pQuant)
+	SNfaFragment NfaCreateStar(SQuantifierData * pQuant)
 	{
 		// create a ?
 		
@@ -348,7 +348,7 @@ struct SNfaBuilder
 		return nfaStar;
 	}
 	
-	SNfaFragment NfaCreateQMark(SParser::SRegex::SQuantifierData * pQuant)
+	SNfaFragment NfaCreateQMark(SQuantifierData * pQuant)
 	{
 		// create a ?
 		
@@ -367,7 +367,7 @@ struct SNfaBuilder
 		return SNfaFragment(pNfasOr, aryUnpatched);
 	}
 	
-	SNfaFragment NfaCreateCountOptional(SParser::SRegex::SQuantifierData * pQuant, int c)
+	SNfaFragment NfaCreateCountOptional(SQuantifierData * pQuant, int c)
 	{
 		assert(c > 0);
 	

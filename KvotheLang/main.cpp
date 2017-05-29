@@ -24,7 +24,7 @@ int main()
 
 			parser.SetInput(pFile);
 			
-			SParser::SRegex * pRegex = parser.RegexFileParse();
+			SRegex * pRegex = parser.RegexFileParse();
 
 			fclose(pFile);
 
