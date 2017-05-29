@@ -5,6 +5,7 @@ using std::queue;
 
 #include "bitary.h"
 #include "macros.h"
+#include "regexparse.h"
 
 struct SNfaState;
 
@@ -186,6 +187,210 @@ struct SNfaFragment
 
 struct SNfaBuilder
 {	
+	SNfaFragment NfafragFromRegex(SParser::SRegex * pRegex)
+	{
+		switch (pRegex->m_regexk)
+		{
+			case SParser::REGEXK_Union:
+				return NfafragFromUnion(pRegex->m_pUnion);
+				break;
+
+			case SParser::REGEXK_Concat:
+				return NfafragFromConcat(pRegex->m_pConcat);
+				break;
+
+			case SParser::REGEXK_Quant:
+				return NfafragFromQuant(pRegex->m_pQuant);
+				break;
+
+			case SParser::REGEXK_Range:
+				return NfafragFromRange(pRegex->m_pRange);
+				break;
+
+			case SParser::REGEXK_Chr:
+				return NfafragFromRegexchr(pRegex->m_pChr);
+				break;
+
+			default:
+				assert(false);
+				return SNfaFragment();
+				break;
+		}
+	}
+
+	SNfaFragment NfafragFromUnion(SParser::SRegex::SUnionData * pUnion)
+	{
+		assert(pUnion->m_arypRegex.size() > 0);
+	
+		SNfaState * pNfasOr = PNfasCreate();
+	
+		vector<SNfaState *> aryUnpatched;
+	
+		for(SParser::SRegex * pRegex : pUnion->m_arypRegex)
+		{
+			SNfaFragment nfaAlt = NfafragFromRegex(pRegex);
+			aryUnpatched.insert(aryUnpatched.end(), nfaAlt.m_aryUnpatched.begin(), nfaAlt.m_aryUnpatched.end());
+			pNfasOr->AddEpsilon(nfaAlt.m_pStateBegin);
+		}
+	
+		return SNfaFragment(pNfasOr, aryUnpatched);
+	}
+
+	SNfaFragment NfafragFromConcat(SParser::SRegex::SConcatinationData * pConcat)
+	{
+		assert(pConcat->m_arypRegex.size() > 0);
+	
+		SNfaFragment nfa = NfafragFromRegex(pConcat->m_arypRegex[0]);
+	
+		for(size_t i = 1; i < pConcat->m_arypRegex.size(); ++i)
+		{
+			nfa.Patch(NfafragFromRegex(pConcat->m_arypRegex[i]));
+		}
+	
+		return nfa;
+	}
+
+	SNfaFragment NfafragFromQuant(SParser::SRegex::SQuantifierData * pQuant)
+	{
+		SNfaFragment nfa;
+	
+		if(pQuant->m_cMic > 0)
+		{
+			nfa = NfaCreateCount(pQuant, pQuant->m_cMic);
+		}
+	
+		if(pQuant->m_cMac == -1)
+		{
+			if(nfa.m_pStateBegin)
+			{
+				nfa.Patch(NfaCreateStar(pQuant));
+			}
+			else
+			{
+				nfa = NfaCreateStar(pQuant);
+			}
+	
+			return nfa;
+		}
+	
+		if(pQuant->m_cMac <= pQuant->m_cMic)
+		{
+			assert(nfa.m_pStateBegin);
+			return nfa;
+		}
+	
+		if(nfa.m_pStateBegin)
+		{
+			nfa.Patch(NfaCreateCountOptional(pQuant, pQuant->m_cMac - pQuant->m_cMic));
+		}
+		else
+		{
+			nfa = NfaCreateCountOptional(pQuant, pQuant->m_cMac - pQuant->m_cMic);
+		}
+	
+		return nfa;
+	}
+
+	SNfaFragment NfafragFromRange(SParser::SRegex::SRangeData * pRange)
+	{
+		SNfaState * pNfasOr = PNfasCreate();
+	
+		for(int iChr = pRange->m_chrMic; iChr <= pRange->m_chrMac; ++iChr)
+		{
+			SNfaState * pNfasChr = PNfasCreate();
+			pNfasChr->AddTransition(iChr, nfasEmpty);
+	
+			pNfasOr->AddEpsilon(pNfasChr);
+		}
+	
+		return SNfaFragment(pNfasOr, pNfasOr->m_aryEpsilon);
+	}
+
+	SNfaFragment NfafragFromRegexchr(SParser::SRegex::SRegexCharData * pRegexchr)
+	{
+		SNfaState * pNfasChr = PNfasCreate();
+		pNfasChr->AddTransition(pRegexchr->m_chr, nfasEmpty);
+	
+		return SNfaFragment(pNfasChr, { pNfasChr });
+	}
+
+	SNfaFragment NfaCreateCount(SParser::SRegex::SQuantifierData * pQuant, int c)
+	{
+		SParser::SRegex::SConcatinationData concat;
+	
+		for(int iC = 0; iC < c; ++ iC)
+		{
+			concat.m_arypRegex.push_back(pQuant->m_pRegex);
+		}
+	
+		return NfafragFromConcat(&concat);
+	}
+	
+	SNfaFragment NfaCreateStar(SParser::SRegex::SQuantifierData * pQuant)
+	{
+		// create a ?
+		
+		SNfaState * pNfasOr = PNfasCreate();
+		SNfaFragment nfa = NfafragFromRegex(pQuant->m_pRegex);
+		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
+		pNfasOr->AddEpsilon(nullptr);
+	
+		// the final nfa will only have one unpatched node, the starting node, 
+		// because the nfa created from m_pregex is patched back to pOrState
+	
+		SNfaFragment nfaStar(pNfasOr, { pNfasOr });
+	
+		// loop back the nfa created from m_pregex to pOrState
+		// turning a ? into a *
+	
+		nfa.Patch(nfaStar);
+	
+		return nfaStar;
+	}
+	
+	SNfaFragment NfaCreateQMark(SParser::SRegex::SQuantifierData * pQuant)
+	{
+		// create a ?
+		
+		SNfaState * pNfasOr = PNfasCreate();
+		SNfaFragment nfa = NfafragFromRegex(pQuant->m_pRegex);
+		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
+		pNfasOr->AddEpsilon(nullptr);
+	
+		// the unpatched states are pOrState and all the unpatched states of
+		// the nfa created from m_pRegex
+	
+		vector<SNfaState *> aryUnpatched;
+		aryUnpatched.push_back(pNfasOr);
+		aryUnpatched.insert(aryUnpatched.end(), nfa.m_aryUnpatched.begin(), nfa.m_aryUnpatched.end());
+	
+		return SNfaFragment(pNfasOr, aryUnpatched);
+	}
+	
+	SNfaFragment NfaCreateCountOptional(SParser::SRegex::SQuantifierData * pQuant, int c)
+	{
+		assert(c > 0);
+	
+		// create nested ?'s, starting on the right and working
+		// back to the left to the starting node
+		
+		SNfaFragment nfaLeftMost;
+	
+		for(int iC = c; iC > 0; --iC)
+		{
+			SNfaFragment nfaQMark = NfaCreateQMark(pQuant);
+	
+			if(nfaLeftMost.m_pStateBegin)
+			{
+				nfaQMark.Patch(nfaLeftMost);
+			}
+	
+			nfaLeftMost = nfaQMark;
+		}
+	
+		return nfaLeftMost;
+	}
+	
 	SNfaState * PNfasCreate()
 	{
 		SNfaState * pNfas = m_poolNfas.PTNew<SNfaState>();

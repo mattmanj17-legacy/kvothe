@@ -24,15 +24,11 @@ int main()
 
 			parser.SetInput(pFile);
 			
-			SRegex * pRegex = parser.RegexFileParse();
+			SParser::SRegex * pRegex = parser.RegexFileParse();
 
 			fclose(pFile);
 
-			nfa = pRegex->NfafragCreate(&nfaBuilder);
-
-			// dont need the regex anymore
-		
-			g_poolRegex.Clear();
+			nfa =  nfaBuilder.NfafragFromRegex(pRegex);
 		}
 
 		SNfaState * pStateAccept = nfaBuilder.PNfasCreate();

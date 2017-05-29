@@ -5,266 +5,111 @@
 #include <string>
 using std::string;
 
-struct SRegex // tag = regex
-{
-	virtual void PrintDebug() = 0;
+#include <vector>
+using std::vector;
 
-	virtual ~SRegex(){};
-
-	virtual SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) = 0;
-};
-
-struct SRegexList : public SRegex // tag = regexlist
-{
-	vector<SRegex *> m_arypRegex;
-};
-
-struct SUnion : public SRegexList // tag = union
-{
-	void PrintDebug() override
-	{
-		printf("(UNION");
-
-		for(SRegex * pRegex : m_arypRegex)
-		{
-			printf(" ");
-			pRegex->PrintDebug();
-		}
-
-		printf(")");
-	}
-
-	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
-	{
-		assert(m_arypRegex.size() > 0);
-
-		SNfaState * pNfasOr = pBuilder->PNfasCreate();
-
-		vector<SNfaState *> aryUnpatched;
-
-		for(SRegex * pRegex : m_arypRegex)
-		{
-			SNfaFragment nfaAlt = pRegex->NfafragCreate(pBuilder);
-			aryUnpatched.insert(aryUnpatched.end(), nfaAlt.m_aryUnpatched.begin(), nfaAlt.m_aryUnpatched.end());
-			pNfasOr->AddEpsilon(nfaAlt.m_pStateBegin);
-		}
-
-		return SNfaFragment(pNfasOr, aryUnpatched);
-	}
-};
-
-struct SConcatination : public SRegexList // tag = concat
-{
-	void PrintDebug() override
-	{
-		printf("(CONCAT");
-
-		for(SRegex * pRegex : m_arypRegex)
-		{
-			printf(" ");
-			pRegex->PrintDebug();
-		}
-
-		printf(")");
-	}
-
-	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
-	{
-		assert(m_arypRegex.size() > 0);
-
-		SNfaFragment nfa = m_arypRegex[0]->NfafragCreate(pBuilder);
-
-		for(size_t i = 1; i < m_arypRegex.size(); ++i)
-		{
-			nfa.Patch(m_arypRegex[i]->NfafragCreate(pBuilder));
-		}
-
-		return nfa;
-	}
-};
-
-struct SQuantifier : public SRegex // tag = quant
-{
-	int m_cMic;
-	int m_cMac;
-	SRegex * m_pRegex;
-
-	void PrintDebug() override
-	{
-		printf("({%d, %d} ", m_cMic, m_cMac);
-
-		m_pRegex->PrintDebug();
-
-		printf(")");
-	}
-
-	SNfaFragment NfaCreateCount(SNfaBuilder * pBuilder, int c)
-	{
-		SConcatination concat;
-
-		for(int iC = 0; iC < c; ++ iC)
-		{
-			concat.m_arypRegex.push_back(m_pRegex);
-		}
-
-		return concat.NfafragCreate(pBuilder);
-	}
-
-	SNfaFragment NfaCreateStar(SNfaBuilder * pBuilder)
-	{
-		// create a ?
-		
-		SNfaState * pNfasOr = pBuilder->PNfasCreate();
-		SNfaFragment nfa = m_pRegex->NfafragCreate(pBuilder);
-		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
-		pNfasOr->AddEpsilon(nullptr);
-
-		// the final nfa will only have one unpatched node, the starting node, 
-		// because the nfa created from m_pregex is patched back to pOrState
-
-		SNfaFragment nfaStar(pNfasOr, { pNfasOr });
-
-		// loop back the nfa created from m_pregex to pOrState
-		// turning a ? into a *
-
-		nfa.Patch(nfaStar);
-
-		return nfaStar;
-	}
-
-	SNfaFragment NfaCreateQMark(SNfaBuilder * pBuilder)
-	{
-		// create a ?
-		
-		SNfaState * pNfasOr = pBuilder->PNfasCreate();
-		SNfaFragment nfa = m_pRegex->NfafragCreate(pBuilder);
-		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
-		pNfasOr->AddEpsilon(nullptr);
-
-		// the unpatched states are pOrState and all the unpatched states of
-		// the nfa created from m_pRegex
-
-		vector<SNfaState *> aryUnpatched;
-		aryUnpatched.push_back(pNfasOr);
-		aryUnpatched.insert(aryUnpatched.end(), nfa.m_aryUnpatched.begin(), nfa.m_aryUnpatched.end());
-
-		return SNfaFragment(pNfasOr, aryUnpatched);
-	}
-
-	SNfaFragment NfaCreateCountOptional(SNfaBuilder * pBuilder, int c)
-	{
-		assert(c > 0);
-
-		// create nested ?'s, starting on the right and working
-		// back to the left to the starting node
-		
-		SNfaFragment nfaLeftMost;
-
-		for(int iC = c; iC > 0; --iC)
-		{
-			SNfaFragment nfaQMark = NfaCreateQMark(pBuilder);
-
-			if(nfaLeftMost.m_pStateBegin)
-			{
-				nfaQMark.Patch(nfaLeftMost);
-			}
-
-			nfaLeftMost = nfaQMark;
-		}
-
-		return nfaLeftMost;
-	}
-
-	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
-	{
-		SNfaFragment nfa;
-
-		if(m_cMic > 0)
-		{
-			nfa = NfaCreateCount(pBuilder, m_cMic);
-		}
-
-		if(m_cMac == -1)
-		{
-			if(nfa.m_pStateBegin)
-			{
-				nfa.Patch(NfaCreateStar(pBuilder));
-			}
-			else
-			{
-				nfa = NfaCreateStar(pBuilder);
-			}
-
-			return nfa;
-		}
-
-		if(m_cMac <= m_cMic)
-		{
-			assert(nfa.m_pStateBegin);
-			return nfa;
-		}
-
-		if(nfa.m_pStateBegin)
-		{
-			nfa.Patch(NfaCreateCountOptional(pBuilder, m_cMac - m_cMic));
-		}
-		else
-		{
-			nfa = NfaCreateCountOptional(pBuilder, m_cMac - m_cMic);
-		}
-
-		return nfa;
-	}
-};
-
-struct SRange : SRegex // tag = range
-{
-	u8 m_chrMic;
-	u8 m_chrMac;
-
-	void PrintDebug() override
-	{
-		printf("(%d '%c' - %d '%c')", m_chrMic, m_chrMic, m_chrMac, m_chrMac);
-	}
-
-	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
-	{
-		SNfaState * pNfasOr = pBuilder->PNfasCreate();
-
-		for(int iChr = m_chrMic; iChr <= m_chrMac; ++iChr)
-		{
-			SNfaState * pNfasChr = pBuilder->PNfasCreate();
-			pNfasChr->AddTransition(iChr, nfasEmpty);
-
-			pNfasOr->AddEpsilon(pNfasChr);
-		}
-
-		return SNfaFragment(pNfasOr, pNfasOr->m_aryEpsilon);
-	}
-};
-
-struct SRegexChar : SRegex // tag = regexchr
-{
-	u8 m_chr;
-
-	void PrintDebug() override
-	{
-		printf("%d '%c'", m_chr, m_chr);
-	}
-
-	SNfaFragment NfafragCreate(SNfaBuilder * pBuilder) override
-	{
-		SNfaState * pNfasChr = pBuilder->PNfasCreate();
-		pNfasChr->AddTransition(m_chr, nfasEmpty);
-
-		return SNfaFragment(pNfasChr, { pNfasChr });
-	}
-};
-
-Pool<SRegex> g_poolRegex;
+#include "types.h"
+#include "pool.h"
 
 struct SParser
 {
+	enum REGEXK
+	{
+		REGEXK_Union,
+		REGEXK_Concat,
+		REGEXK_Quant,
+		REGEXK_Range,
+		REGEXK_Chr,
+	};
+	
+	struct SRegex // tag = regex
+	{
+		void PrintDebug() {}
+		REGEXK m_regexk;
+
+		struct SUnionData // tag = union
+		{
+			vector<SRegex *> m_arypRegex;
+			
+			void PrintDebug()
+			{
+				printf("(UNION");
+
+				for(SRegex * pRegex : m_arypRegex)
+				{
+					printf(" ");
+					pRegex->PrintDebug();
+				}
+
+				printf(")");
+			}
+		};
+	
+		struct SConcatinationData // tag = concat
+		{
+			vector<SRegex *> m_arypRegex;
+			
+			void PrintDebug()
+			{
+				printf("(CONCAT");
+	
+				for(SRegex * pRegex : m_arypRegex)
+				{
+					printf(" ");
+					pRegex->PrintDebug();
+				}
+	
+				printf(")");
+			}
+		};
+	
+		struct SQuantifierData
+		{
+			int m_cMic;
+			int m_cMac;
+			SRegex * m_pRegex;
+	
+			void PrintDebug()
+			{
+				printf("({%d, %d} ", m_cMic, m_cMac);
+	
+				m_pRegex->PrintDebug();
+	
+				printf(")");
+			}
+		};
+	
+		struct SRangeData
+		{
+			u8 m_chrMic;
+			u8 m_chrMac;
+	
+			void PrintDebug()
+			{
+				printf("(%d '%c' - %d '%c')", m_chrMic, m_chrMic, m_chrMac, m_chrMac);
+			}	
+		};
+	
+		struct SRegexCharData
+		{
+			u8 m_chr;
+	
+			void PrintDebug()
+			{
+				printf("%d '%c'", m_chr, m_chr);
+			}	
+		};
+
+		union
+		{
+			SUnionData * m_pUnion;
+			SConcatinationData * m_pConcat;
+			SQuantifierData * m_pQuant;
+			SRangeData * m_pRange;
+			SRegexCharData * m_pChr;
+		};
+	};
+	
 	SRegex * RegexFileParse()
 	{
 		SRegex * pRegex = RegexParse();
@@ -293,7 +138,8 @@ struct SParser
 		
 		if(ChrCur() == '|')
 		{
-			SUnion * pUnion = g_poolRegex.PTNew<SUnion>();
+			SRegex * pRegex = PRegexCreate(REGEXK_Union);
+			SRegex::SUnionData * pUnion = pRegex->m_pUnion;
 			pUnion->m_arypRegex.push_back(pConcat);
 			
 			while(ChrCur() == '|')
@@ -302,7 +148,7 @@ struct SParser
 				pUnion->m_arypRegex.push_back(ConcatParse());
 			}
 
-			return pUnion;
+			return pRegex;
 		}
 
 		// otherwise, just return the concat we parsed
@@ -332,7 +178,8 @@ struct SParser
 
 		if(FChrCanBeginAtom(ChrCur()))
 		{
-			SConcatination * pConcat = g_poolRegex.PTNew<SConcatination>();
+			SRegex * pRegex = PRegexCreate(REGEXK_Concat);
+			SRegex::SConcatinationData * pConcat = pRegex->m_pConcat;
 			pConcat->m_arypRegex.push_back(pQuant);
 			
 			while(FChrCanBeginAtom(ChrCur()))
@@ -340,7 +187,7 @@ struct SParser
 				pConcat->m_arypRegex.push_back(QuantParse());
 			}
 
-			return pConcat;
+			return pRegex;
 		}
 
 		// otherwise, just return the quant we parsed
@@ -362,7 +209,7 @@ struct SParser
 		return atoi(strNum.c_str());
 	}
 
-	void ParseInitQuantExplicit(SQuantifier * pQuant)
+	void ParseInitQuantExplicit(SRegex::SQuantifierData * pQuant)
 	{
 		// handle {,} syntax
 		
@@ -405,7 +252,7 @@ struct SParser
 		MatchChr('}');
 	}
 
-	void ParseInitQuant(SQuantifier * pQuant)
+	void ParseInitQuant(SRegex::SQuantifierData * pQuant)
 	{
 		// set cMic and cMac based on the current quantifier
 		
@@ -449,12 +296,13 @@ struct SParser
 			// while there is a chr that begins a quantification, 
 			// make a new quantifier quantifieing the regex to the left
 			
-			SQuantifier * pQuant = g_poolRegex.PTNew<SQuantifier>();
+			SRegex * pRegex = PRegexCreate(REGEXK_Quant);
+			SRegex::SQuantifierData * pQuant = pRegex->m_pQuant;
 			pQuant->m_pRegex = pRegexCur;
 
 			ParseInitQuant(pQuant);
 
-			pRegexCur = pQuant;
+			pRegexCur = pRegex;
 		}
 
 		// return the quantified regex (either the original atom, or nested quantifiers ending with the atom)
@@ -558,29 +406,32 @@ struct SParser
 		{
 			MatchChr('.');
 			
-			SRange * pRange = g_poolRegex.PTNew<SRange>();
+			SRegex * pRegex = PRegexCreate(REGEXK_Range);
+			SRegex::SRangeData * pRange = pRegex->m_pRange;
 			pRange->m_chrMic = 0;
 			pRange->m_chrMac = 255;
 
-			return pRange;
+			return pRegex;
 		}
 		else if(ChrCur() == '\\')
 		{
 			MatchChr('\\');
 
-			SRegexChar * pRegexchar = g_poolRegex.PTNew<SRegexChar>();
+			SRegex * pRegex = PRegexCreate(REGEXK_Chr);
+			SRegex::SRegexCharData * pRegexchar = pRegex->m_pChr;
 			pRegexchar->m_chr = ChrEscaped();
 
-			return pRegexchar;
+			return pRegex;
 		}
 		else
 		{
 			assert(FChrCanBeginAtom(ChrCur()));
 
-			SRegexChar * pRegexchar = g_poolRegex.PTNew<SRegexChar>();
+			SRegex * pRegex = PRegexCreate(REGEXK_Chr);
+			SRegex::SRegexCharData * pRegexchar = pRegex->m_pChr;
 			pRegexchar->m_chr = ChrConsume();
 
-			return pRegexchar;
+			return pRegex;
 		}
 	}
 
@@ -655,7 +506,8 @@ struct SParser
 
 		// convert mpChrF to a union of ranges
 
-		SUnion * pUnion = g_poolRegex.PTNew<SUnion>();
+		SRegex * pRegex = PRegexCreate(REGEXK_Union);
+		SRegex::SUnionData * pUnion = pRegex->m_pUnion;
 		
 		for(int iChr = 0; iChr < 256; ++iChr)
 		{
@@ -676,16 +528,18 @@ struct SParser
 				
 				if(chrBegin == iChr)
 				{
-					SRegexChar * pRegexchar = g_poolRegex.PTNew<SRegexChar>();
+					SRegex * pRegex = PRegexCreate(REGEXK_Chr);
+					SRegex::SRegexCharData * pRegexchar = pRegex->m_pChr;
 					pRegexchar->m_chr = chrBegin;
-					pUnion->m_arypRegex.push_back(pRegexchar);
+					pUnion->m_arypRegex.push_back(pRegex);
 				}
 				else
 				{
-					SRange * pRange = g_poolRegex.PTNew<SRange>();
+					SRegex * pRegex = PRegexCreate(REGEXK_Range);
+					SRegex::SRangeData * pRange = pRegex->m_pRange;
 					pRange->m_chrMic = chrBegin;
 					pRange->m_chrMac = iChr;
-					pUnion->m_arypRegex.push_back(pRange);
+					pUnion->m_arypRegex.push_back(pRegex);
 				}
 			}
 		}
@@ -694,7 +548,7 @@ struct SParser
 
 		assert(pUnion->m_arypRegex.size() > 0);
 
-		return pUnion;
+		return pRegex;
 	}
 	
 	u8 ChrCur()
@@ -724,6 +578,46 @@ struct SParser
 		(void) ChrConsume();
 	}
 
+	SRegex* PRegexCreate(REGEXK regexk)
+	{
+		SRegex* pRegex = m_poolRegex.PTNew<SRegex>();
+
+		pRegex->m_regexk = regexk;
+
+		switch (regexk)
+		{
+			case SParser::REGEXK_Union:
+				pRegex->m_pUnion = m_poolRegexData.PTNew<SRegex::SUnionData>();
+				break;
+
+			case SParser::REGEXK_Concat:
+				pRegex->m_pConcat = m_poolRegexData.PTNew<SRegex::SConcatinationData>();
+				break;
+
+			case SParser::REGEXK_Quant:
+				pRegex->m_pQuant = m_poolRegexData.PTNew<SRegex::SQuantifierData>();
+				break;
+
+			case SParser::REGEXK_Range:
+				pRegex->m_pRange = m_poolRegexData.PTNew<SRegex::SRangeData>();
+				break;
+
+			case SParser::REGEXK_Chr:
+				pRegex->m_pChr = m_poolRegexData.PTNew<SRegex::SRegexCharData>();
+				break;
+
+			default:
+				assert(false);
+				break;
+		}
+
+		return pRegex;
+	}
+
 	u8	m_chrCur;
 	FILE *			m_pFile;
+
+	Pool<SRegex> m_poolRegex;
+
+	VoidPool m_poolRegexData;
 };
