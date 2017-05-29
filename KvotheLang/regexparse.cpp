@@ -119,19 +119,6 @@ SRegexAstNode CRegexParser::UnionParse()
 	return regexConcat;
 }
 
-bool CRegexParser::FChrCanBeginAtom(u8 chr)
-{
-	return	ChrPeek() != ')' &&
-			ChrPeek() != '|' &&
-			ChrPeek() != '*' &&
-			ChrPeek() != '+' &&
-			ChrPeek() != '?' &&
-			ChrPeek() != '{' &&
-			ChrPeek() != '}' &&
-			ChrPeek() != ']' &&
-			!iscntrl(ChrPeek());
-}
-
 SRegexAstNode CRegexParser::ConcatParse()
 {
 	SRegexAstNode regexQuant = QuantParse();
@@ -155,20 +142,6 @@ SRegexAstNode CRegexParser::ConcatParse()
 	// otherwise, just return the quant we parsed
 
 	return regexQuant;
-}
-
-int CRegexParser::NConsume()
-{
-	assert(isdigit(ChrPeek()));
-	
-	string strNum = "";
-
-	while(isdigit(ChrPeek()))
-	{
-		strNum += ChrConsume();
-	}
-
-	return atoi(strNum.c_str());
 }
 
 SRegexAstNode CRegexParser::QuantParse()
@@ -261,88 +234,6 @@ SRegexAstNode CRegexParser::QuantParse()
 	return regexCur;
 }
 
-u8 CRegexParser::ChrConsumeHex()
-{
-	u8 chrHex = ChrConsume();
-
-	assert(
-		(chrHex >= '0' && chrHex <= '9') ||
-		(chrHex >= 'a' && chrHex <= 'f') ||
-		(chrHex >= 'A' && chrHex <= 'F')
-	);
-
-	return chrHex;
-}
-
-u8 CRegexParser::ChrConsumeEscaped()
-{
-	u8 chrEscape = ChrConsume();
-
-	if(chrEscape == 'a')		return '\a';
-	else if(chrEscape == 'b')	return '\b';
-	else if(chrEscape == 'e')	return 27; // '\e'
-	else if(chrEscape == 'f')	return '\f';
-	else if(chrEscape == 'n')	return '\n';
-	else if(chrEscape == 'r')	return '\r';
-	else if(chrEscape == 't')	return '\t';
-	else if(chrEscape == 'v')	return '\v';
-	else if(chrEscape == 'c')
-	{
-		// \cA control character
-		
-		assert(isalpha(ChrPeek()));
-		u8 chr = tolower(ChrConsume());
-		return chr - 'a' + 1;
-	}
-	else if(chrEscape == 'x')
-	{
-		// hex byte
-		
-		string strHex = "";
-		
-		strHex += ChrConsumeHex();
-		strHex += ChrConsumeHex();
-		
-		return (u8) strtol(strHex.c_str(), nullptr, 16);
-	}
-	else if(isdigit(chrEscape))
-	{
-		// octal byte
-		
-		string strOctal = "";
-		strOctal += chrEscape;
-
-		int cDigit = 0;
-
-		while(isdigit(ChrPeek()) && cDigit < 2)
-		{
-			strOctal += ChrConsume();
-			++cDigit;
-		}
-
-		return (u8) strtol(strOctal.c_str(), nullptr, 8);
-	}
-	else
-	{
-		assert(
-			chrEscape == '.' ||
-			chrEscape == '\\' ||
-			chrEscape == '(' ||
-			chrEscape == ')' ||
-			chrEscape == '|' ||
-			chrEscape == '*' ||
-			chrEscape == '+' ||
-			chrEscape == '?' ||
-			chrEscape == '{' ||
-			chrEscape == '}' || 
-			chrEscape == '[' ||
-			chrEscape == ']'
-		);
-
-		return chrEscape;
-	}
-}
-
 SRegexAstNode CRegexParser::AtomParse()
 {
 	if(ChrPeek() == '(')
@@ -383,31 +274,6 @@ SRegexAstNode CRegexParser::AtomParse()
 
 		return regexChr;
 	}
-}
-
-bool CRegexParser::FChrCanBeginRange(u8 chr)
-{
-	return 
-		chr != '[' && 
-		chr != ']' && 
-		chr != '-' && 
-		!iscntrl(chr);
-}
-
-u8 CRegexParser::ChrConsumeSet()
-{
-	assert(FChrCanBeginRange(ChrPeek()));
-	
-	if(ChrPeek() == '\\')
-	{
-		MatchChr('\\');
-
-		// '-' is an escape char in a set
-		
-		return ChrPeek() == '-' ? ChrConsume() : ChrConsumeEscaped();
-	}
-		
-	return ChrConsume();
 }
 
 SRegexAstNode CRegexParser::SetParse()
@@ -507,17 +373,151 @@ SRegexAstNode CRegexParser::SetParse()
 		return regexUnion;
 }
 
-u8 CRegexParser::ChrPeek()
-{
-	return m_chrCur;
-}
-
 u8 CRegexParser::ChrConsume()
 {
 	u8 chrPrev = m_chrCur;
 	m_chrCur = (u8)fgetc(m_pFile);
 
 	return chrPrev;
+}
+
+u8 CRegexParser::ChrConsumeHex()
+{
+	u8 chrHex = ChrConsume();
+
+	assert(
+		(chrHex >= '0' && chrHex <= '9') ||
+		(chrHex >= 'a' && chrHex <= 'f') ||
+		(chrHex >= 'A' && chrHex <= 'F')
+	);
+
+	return chrHex;
+}
+
+u8 CRegexParser::ChrConsumeSet()
+{
+	assert(FChrCanBeginRange(ChrPeek()));
+	
+	if(ChrPeek() == '\\')
+	{
+		MatchChr('\\');
+
+		// '-' is an escape char in a set
+		
+		return ChrPeek() == '-' ? ChrConsume() : ChrConsumeEscaped();
+	}
+		
+	return ChrConsume();
+}
+
+u8 CRegexParser::ChrConsumeEscaped()
+{
+	u8 chrEscape = ChrConsume();
+
+	if(chrEscape == 'a')		return '\a';
+	else if(chrEscape == 'b')	return '\b';
+	else if(chrEscape == 'e')	return 27; // '\e'
+	else if(chrEscape == 'f')	return '\f';
+	else if(chrEscape == 'n')	return '\n';
+	else if(chrEscape == 'r')	return '\r';
+	else if(chrEscape == 't')	return '\t';
+	else if(chrEscape == 'v')	return '\v';
+	else if(chrEscape == 'c')
+	{
+		// \cA control character
+		
+		assert(isalpha(ChrPeek()));
+		u8 chr = tolower(ChrConsume());
+		return chr - 'a' + 1;
+	}
+	else if(chrEscape == 'x')
+	{
+		// hex byte
+		
+		string strHex = "";
+		
+		strHex += ChrConsumeHex();
+		strHex += ChrConsumeHex();
+		
+		return (u8) strtol(strHex.c_str(), nullptr, 16);
+	}
+	else if(isdigit(chrEscape))
+	{
+		// octal byte
+		
+		string strOctal = "";
+		strOctal += chrEscape;
+
+		int cDigit = 0;
+
+		while(isdigit(ChrPeek()) && cDigit < 2)
+		{
+			strOctal += ChrConsume();
+			++cDigit;
+		}
+
+		return (u8) strtol(strOctal.c_str(), nullptr, 8);
+	}
+	else
+	{
+		assert(
+			chrEscape == '.' ||
+			chrEscape == '\\' ||
+			chrEscape == '(' ||
+			chrEscape == ')' ||
+			chrEscape == '|' ||
+			chrEscape == '*' ||
+			chrEscape == '+' ||
+			chrEscape == '?' ||
+			chrEscape == '{' ||
+			chrEscape == '}' || 
+			chrEscape == '[' ||
+			chrEscape == ']'
+		);
+
+		return chrEscape;
+	}
+}
+
+int CRegexParser::NConsume()
+{
+	assert(isdigit(ChrPeek()));
+	
+	string strNum = "";
+
+	while(isdigit(ChrPeek()))
+	{
+		strNum += ChrConsume();
+	}
+
+	return atoi(strNum.c_str());
+}
+
+u8 CRegexParser::ChrPeek()
+{
+	return m_chrCur;
+}
+
+bool CRegexParser::FChrCanBeginAtom(u8 chr)
+{
+	return	ChrPeek() != ')' &&
+			ChrPeek() != '|' &&
+			ChrPeek() != '*' &&
+			ChrPeek() != '+' &&
+			ChrPeek() != '?' &&
+			ChrPeek() != '{' &&
+			ChrPeek() != '}' &&
+			ChrPeek() != ']' &&
+			!iscntrl(ChrPeek());
+}
+
+bool CRegexParser::FChrCanBeginRange(u8 chr)
+{
+	return 
+		chr != '[' && 
+		chr != ']' && 
+		chr != '-' && 
+		!iscntrl(chr);
 }
 
 void CRegexParser::MatchChr(u8 chrMatch)
