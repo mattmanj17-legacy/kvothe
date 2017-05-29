@@ -81,37 +81,37 @@ class CRegexParser
 {
 public:
 
-	void				ParseFile(FILE * pFile);		// parse a whole file as one regex
-	SRegexAstNode		PRegexAstParsed();				// the regex parsed in ParseFile
+	void					ParseFile(FILE * pFile);	// parse a whole file as one regex
+	const SRegexAstNode *	PRegexAstParsed();			// the regex parsed in ParseFile
 
 private:
 
-	SRegexAstNode		RegexParse();					
-	SRegexAstNode		UnionParse();					
-	SRegexAstNode		ConcatParse();					
-	SRegexAstNode		QuantParse();					
-	SRegexAstNode		AtomParse();					
-	SRegexAstNode		SetParse();						
+	SRegexAstNode			RegexParse();					
+	SRegexAstNode			UnionParse();					
+	SRegexAstNode			ConcatParse();					
+	SRegexAstNode			QuantParse();					
+	SRegexAstNode			AtomParse();					
+	SRegexAstNode			SetParse();						
 
-	u8					ChrConsume();					// return the current chr and read a new one
-	u8					ChrConsumeHex();				// check that the current chr is hex, then consume it
-	u8					ChrConsumeSet();				// check that the current chr is a valid set chr, then consume it
-	u8					ChrConsumeEscaped();			// check that the current chr is a vlid escape chr, then consume it
+	u8						ChrConsume();				// return the current chr and read a new one
+	u8						ChrConsumeHex();			// check that the current chr is hex, then consume it
+	u8						ChrConsumeSet();			// check that the current chr is a valid set chr, then consume it
+	u8						ChrConsumeEscaped();		// check that the current chr is a vlid escape chr, then consume it
 
-	int					NConsume();						// consume a base ten integer from input
+	int						NConsume();					// consume a base ten integer from input
 	
-	u8					ChrPeek();						// return the current chr, but do not read a new one
+	u8						ChrPeek();					// return the current chr, but do not read a new one
 	
-	bool				FChrCanBeginAtom(u8 chr);		// is a chr a valid atom chr?
-	bool				FChrCanBeginRange(u8 chr);		// is a chr a valid set chr?
+	bool					FChrCanBeginAtom(u8 chr);	// is a chr a valid atom chr?
+	bool					FChrCanBeginRange(u8 chr);	// is a chr a valid set chr?
 	
-	void				MatchChr(u8 chrMatch);			// check that the current char is a given one, then consume it
+	void					MatchChr(u8 chrMatch);		// check that the current char is a given one, then consume it
 
-	SRegexAstNode		RegexCreate(REGEXK regexk);		// create a regex and its data (in m_poolRegex and m_poolRegexData) based on REGEXK
+	SRegexAstNode			RegexCreate(REGEXK regexk);	// create a regex and its data (in m_poolRegex and m_poolRegexData) based on REGEXK
 	
-	u8					m_chrCur;						
-	FILE *				m_pFile;						// the file we are consuming chrs from
-	SRegexAstNode		m_regexAstParsed;				// the regex parsed in ParseFile
+	u8						m_chrCur;						
+	FILE *					m_pFile;					// the file we are consuming chrs from
+	SRegexAstNode			m_regexAstParsed;			// the regex parsed in ParseFile
 	
-	VoidPool			m_poolRegexData;				// pool for allocating regex data			
+	VoidPool				m_poolRegexData;			// pool for allocating regex data			
 };

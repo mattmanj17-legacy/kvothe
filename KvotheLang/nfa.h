@@ -187,28 +187,28 @@ struct SNfaFragment
 
 struct SNfaBuilder
 {	
-	SNfaFragment NfafragFromRegex(SRegexAstNode regex)
+	SNfaFragment NfafragFromRegex(const SRegexAstNode * pRegex)
 	{
-		switch (regex.m_regexk)
+		switch (pRegex->m_regexk)
 		{
 			case REGEXK_Union:
-				return NfafragFromUnion(regex.m_pUnionData);
+				return NfafragFromUnion(pRegex->m_pUnionData);
 				break;
 
 			case REGEXK_Concat:
-				return NfafragFromConcat(regex.m_pConcatData);
+				return NfafragFromConcat(pRegex->m_pConcatData);
 				break;
 
 			case REGEXK_Quant:
-				return NfafragFromQuant(regex.m_pQuantData);
+				return NfafragFromQuant(pRegex->m_pQuantData);
 				break;
 
 			case REGEXK_Range:
-				return NfafragFromRange(regex.m_pRangeData);
+				return NfafragFromRange(pRegex->m_pRangeData);
 				break;
 
 			case REGEXK_Chr:
-				return NfafragFromRegexchr(regex.m_pChrData);
+				return NfafragFromRegexchr(pRegex->m_pChrData);
 				break;
 
 			default:
@@ -218,7 +218,7 @@ struct SNfaBuilder
 		}
 	}
 
-	SNfaFragment NfafragFromUnion(SUnionRegexData * pUnion)
+	SNfaFragment NfafragFromUnion(const SUnionRegexData * pUnion)
 	{
 		assert(pUnion->m_aryRegex.size() > 0);
 	
@@ -226,9 +226,9 @@ struct SNfaBuilder
 	
 		vector<SNfaState *> aryUnpatched;
 	
-		for(SRegexAstNode regex : pUnion->m_aryRegex)
+		for(size_t iRegex = 0; iRegex < pUnion->m_aryRegex.size(); ++iRegex)
 		{
-			SNfaFragment nfaAlt = NfafragFromRegex(regex);
+			SNfaFragment nfaAlt = NfafragFromRegex(&pUnion->m_aryRegex[iRegex]);
 			aryUnpatched.insert(aryUnpatched.end(), nfaAlt.m_aryUnpatched.begin(), nfaAlt.m_aryUnpatched.end());
 			pNfasOr->AddEpsilon(nfaAlt.m_pStateBegin);
 		}
@@ -236,21 +236,21 @@ struct SNfaBuilder
 		return SNfaFragment(pNfasOr, aryUnpatched);
 	}
 
-	SNfaFragment NfafragFromConcat(SConcatinationRegexData * pConcat)
+	SNfaFragment NfafragFromConcat(const SConcatinationRegexData * pConcat)
 	{
 		assert(pConcat->m_aryRegex.size() > 0);
 	
-		SNfaFragment nfa = NfafragFromRegex(pConcat->m_aryRegex[0]);
+		SNfaFragment nfa = NfafragFromRegex(&pConcat->m_aryRegex[0]);
 	
 		for(size_t i = 1; i < pConcat->m_aryRegex.size(); ++i)
 		{
-			nfa.Patch(NfafragFromRegex(pConcat->m_aryRegex[i]));
+			nfa.Patch(NfafragFromRegex(&pConcat->m_aryRegex[i]));
 		}
 	
 		return nfa;
 	}
 
-	SNfaFragment NfafragFromQuant(SQuantifierRegexData * pQuant)
+	SNfaFragment NfafragFromQuant(const SQuantifierRegexData * pQuant)
 	{
 		SNfaFragment nfa;
 	
@@ -291,7 +291,7 @@ struct SNfaBuilder
 		return nfa;
 	}
 
-	SNfaFragment NfafragFromRange(SRangeRegexData * pRange)
+	SNfaFragment NfafragFromRange(const SRangeRegexData * pRange)
 	{
 		SNfaState * pNfasOr = PNfasCreate();
 	
@@ -306,7 +306,7 @@ struct SNfaBuilder
 		return SNfaFragment(pNfasOr, pNfasOr->m_aryEpsilon);
 	}
 
-	SNfaFragment NfafragFromRegexchr(SChrRegexData * pRegexchr)
+	SNfaFragment NfafragFromRegexchr(const SChrRegexData * pRegexchr)
 	{
 		SNfaState * pNfasChr = PNfasCreate();
 		pNfasChr->AddTransition(pRegexchr->m_chr, nfasEmpty);
@@ -314,7 +314,7 @@ struct SNfaBuilder
 		return SNfaFragment(pNfasChr, { pNfasChr });
 	}
 
-	SNfaFragment NfaCreateCount(SQuantifierRegexData * pQuant, int c)
+	SNfaFragment NfaCreateCount(const SQuantifierRegexData * pQuant, int c)
 	{
 		SConcatinationRegexData concat;
 	
@@ -326,12 +326,12 @@ struct SNfaBuilder
 		return NfafragFromConcat(&concat);
 	}
 	
-	SNfaFragment NfaCreateStar(SQuantifierRegexData * pQuant)
+	SNfaFragment NfaCreateStar(const SQuantifierRegexData * pQuant)
 	{
 		// create a ?
 		
 		SNfaState * pNfasOr = PNfasCreate();
-		SNfaFragment nfa = NfafragFromRegex(pQuant->m_regex);
+		SNfaFragment nfa = NfafragFromRegex(&pQuant->m_regex);
 		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
 		pNfasOr->AddEpsilon(nullptr);
 	
@@ -348,12 +348,12 @@ struct SNfaBuilder
 		return nfaStar;
 	}
 	
-	SNfaFragment NfaCreateQMark(SQuantifierRegexData * pQuant)
+	SNfaFragment NfaCreateQMark(const SQuantifierRegexData * pQuant)
 	{
 		// create a ?
 		
 		SNfaState * pNfasOr = PNfasCreate();
-		SNfaFragment nfa = NfafragFromRegex(pQuant->m_regex);
+		SNfaFragment nfa = NfafragFromRegex(&pQuant->m_regex);
 		pNfasOr->AddEpsilon(nfa.m_pStateBegin);
 		pNfasOr->AddEpsilon(nullptr);
 	
@@ -367,7 +367,7 @@ struct SNfaBuilder
 		return SNfaFragment(pNfasOr, aryUnpatched);
 	}
 	
-	SNfaFragment NfaCreateCountOptional(SQuantifierRegexData * pQuant, int c)
+	SNfaFragment NfaCreateCountOptional(const SQuantifierRegexData * pQuant, int c)
 	{
 		assert(c > 0);
 	

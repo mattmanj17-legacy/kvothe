@@ -75,11 +75,12 @@ void CRegexParser::ParseFile(FILE * pFile)
 	assert(fgetc(m_pFile) == EOF);
 }
 
-SRegexAstNode CRegexParser::PRegexAstParsed()
+const SRegexAstNode * CRegexParser::PRegexAstParsed()
 {
-	assert(m_regexAstParsed.m_regexk != REGEXK_Nil);
-	
-	return m_regexAstParsed;
+	if(m_regexAstParsed.m_regexk != REGEXK_Nil)
+		return &m_regexAstParsed;
+	else
+		return nullptr;
 }
 
 SRegexAstNode CRegexParser::RegexParse()
