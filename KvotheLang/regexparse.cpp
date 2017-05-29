@@ -77,6 +77,8 @@ void CRegexParser::ParseFile(FILE * pFile)
 
 SRegexAstNode CRegexParser::PRegexAstParsed()
 {
+	assert(m_regexAstParsed.m_regexk != REGEXK_Nil);
+	
 	return m_regexAstParsed;
 }
 

@@ -15,6 +15,7 @@ enum REGEXK
 	REGEXK_Quant,
 	REGEXK_Range,
 	REGEXK_Chr,
+	REGEXK_Nil,
 };
 
 struct SUnionRegexData;
@@ -25,6 +26,12 @@ struct SChrRegexData;
 
 struct SRegexAstNode
 {
+									SRegexAstNode()
+									: m_pUnionData(nullptr)
+									, m_regexk(REGEXK_Nil)
+									{
+									}
+	
 	void							PrintDebug();
 	
 	// regex data
