@@ -20,12 +20,17 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="KvotheLang\murmurhash.cpp" />
-    <ClCompile Include="KvotheLang\regex.cpp" />
+    <ClCompile Include="KvotheLang\main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="KvotheLang\bitary.h" />
+    <ClInclude Include="KvotheLang\dfa.h" />
     <ClInclude Include="KvotheLang\macros.h" />
     <ClInclude Include="KvotheLang\murmurhash.h" />
+    <ClInclude Include="KvotheLang\nfa.h" />
+    <ClInclude Include="KvotheLang\pool.h" />
+    <ClInclude Include="KvotheLang\regex.h" />
+    <ClInclude Include="KvotheLang\regexparse.h" />
     <ClInclude Include="KvotheLang\types.h" />
   </ItemGroup>
   <ItemGroup>

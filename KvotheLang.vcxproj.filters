@@ -18,10 +18,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="KvotheLang\regex.cpp">
+    <ClCompile Include="KvotheLang\murmurhash.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="KvotheLang\murmurhash.cpp">
+    <ClCompile Include="KvotheLang\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -36,6 +36,21 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="KvotheLang\murmurhash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KvotheLang\pool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KvotheLang\nfa.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KvotheLang\dfa.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KvotheLang\regex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KvotheLang\regexparse.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
