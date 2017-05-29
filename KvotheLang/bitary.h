@@ -90,7 +90,7 @@ public:
 		return true;
 	}
 
-	size_t Hash() const
+	size_t NHash() const
 	{
 		// hash is special. even if we are const, still update m_fIsHashDirty and m_hash
 		
