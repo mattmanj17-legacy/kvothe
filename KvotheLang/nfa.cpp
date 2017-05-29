@@ -46,11 +46,11 @@ void CNfaState::PrintDebug() const
 
 void CNfaState::Patch(CNfaState * pNfas)
 {
-	for(size_t iEpsilon = 0; iEpsilon < m_arypStateTransitionEpsilon.size(); ++iEpsilon)
+	for(size_t iEpsilonTransition = 0; iEpsilonTransition < m_arypStateTransitionEpsilon.size(); ++iEpsilonTransition)
 	{
-		if(!m_arypStateTransitionEpsilon[iEpsilon])
+		if(!m_arypStateTransitionEpsilon[iEpsilonTransition])
 		{
-			m_arypStateTransitionEpsilon[iEpsilon] = pNfas;
+			m_arypStateTransitionEpsilon[iEpsilonTransition] = pNfas;
 		}
 	}
 
@@ -67,9 +67,9 @@ bool CNfaState::FIsUnpatched() const
 {
 	// BB (matthewd) cache this value instead?
 	
-	for(size_t iEpsilon = 0; iEpsilon < m_arypStateTransitionEpsilon.size(); ++iEpsilon)
+	for(size_t iEpsilonTransition = 0; iEpsilonTransition < m_arypStateTransitionEpsilon.size(); ++iEpsilonTransition)
 	{
-		if(!m_arypStateTransitionEpsilon[iEpsilon])
+		if(!m_arypStateTransitionEpsilon[iEpsilonTransition])
 			return true;
 	}
 
@@ -92,13 +92,13 @@ void CNfaState::ComputeEpsilonClosure(int cState)
 
 	// breadth first search for nodes we can reach by 0 or more epsilon transitions
 	
-	queue<const CNfaState*> qpNfas;
-	qpNfas.push(this);
+	queue<const CNfaState*> qpState;
+	qpState.push(this);
 
-	while(qpNfas.size() > 0)
+	while(qpState.size() > 0)
 	{
-		const CNfaState* pNfas = qpNfas.front();
-		qpNfas.pop();
+		const CNfaState* pNfas = qpState.front();
+		qpState.pop();
 
 		if(!m_baryEpsilonClosure.At(pNfas->m_nId))
 		{
@@ -106,7 +106,7 @@ void CNfaState::ComputeEpsilonClosure(int cState)
 		
 			for(const CNfaState* pStateEpsilon : pNfas->m_arypStateTransitionEpsilon)
 			{
-				qpNfas.push(pStateEpsilon);
+				qpState.push(pStateEpsilon);
 			}
 		}
 	}
@@ -126,9 +126,9 @@ CNfa::SNfaFragment::SNfaFragment(CNfaState * pNfas, vector<CNfaState *> aryUnpat
 
 void CNfa::SNfaFragment::Patch(CNfa::SNfaFragment nfa)
 {
-	for(CNfaState * Nfas : m_arypStateUnpatched)
+	for(CNfaState * pState : m_arypStateUnpatched)
 	{
-		Nfas->Patch(nfa.m_pStateBegin);
+		pState->Patch(nfa.m_pStateBegin);
 	}
 
 	m_arypStateUnpatched.clear();
@@ -138,11 +138,11 @@ void CNfa::SNfaFragment::Patch(CNfa::SNfaFragment nfa)
 	// so we may have already patched some of the nodes in nfa.m_arypStateUnpatched
 	// BB (matthewd) hmm.... i dont like this
 	
-	for(CNfaState * Nfas : nfa.m_arypStateUnpatched)
+	for(CNfaState * pState : nfa.m_arypStateUnpatched)
 	{
-		if(Nfas->FIsUnpatched())
+		if(pState->FIsUnpatched())
 		{
-			m_arypStateUnpatched.push_back(Nfas);
+			m_arypStateUnpatched.push_back(pState);
 		}
 	}
 }
@@ -211,9 +211,9 @@ CNfa::SNfaFragment CNfa::FragFromUnion(const SUnionRegexData * pUnion)
 
 	for(size_t iRegex = 0; iRegex < pUnion->m_aryRegex.size(); ++iRegex)
 	{
-		SNfaFragment nfaAlt = FragFromRegex(&pUnion->m_aryRegex[iRegex]);
-		aryUnpatched.insert(aryUnpatched.end(), nfaAlt.m_arypStateUnpatched.begin(), nfaAlt.m_arypStateUnpatched.end());
-		pNfasOr->AddEpsilonTransition(nfaAlt.m_pStateBegin);
+		SNfaFragment frag = FragFromRegex(&pUnion->m_aryRegex[iRegex]);
+		aryUnpatched.insert(aryUnpatched.end(), frag.m_arypStateUnpatched.begin(), frag.m_arypStateUnpatched.end());
+		pNfasOr->AddEpsilonTransition(frag.m_pStateBegin);
 	}
 
 	return SNfaFragment(pNfasOr, aryUnpatched);
@@ -223,164 +223,164 @@ CNfa::SNfaFragment CNfa::FragFromConcat(const SConcatinationRegexData * pConcat)
 {
 	assert(pConcat->m_aryRegex.size() > 0);
 
-	CNfa::SNfaFragment nfa = FragFromRegex(&pConcat->m_aryRegex[0]);
+	CNfa::SNfaFragment frag = FragFromRegex(&pConcat->m_aryRegex[0]);
 
 	for(size_t i = 1; i < pConcat->m_aryRegex.size(); ++i)
 	{
-		nfa.Patch(FragFromRegex(&pConcat->m_aryRegex[i]));
+		frag.Patch(FragFromRegex(&pConcat->m_aryRegex[i]));
 	}
 
-	return nfa;
+	return frag;
 }
 
 CNfa::SNfaFragment CNfa::FragFromQuant(const SQuantifierRegexData * pQuant)
 {
-	CNfa::SNfaFragment nfa;
+	CNfa::SNfaFragment frag;
 
 	if(pQuant->m_cMic > 0)
 	{
-		nfa = FragCreateCount(&pQuant->m_regex, pQuant->m_cMic);
+		frag = FragCreateCount(&pQuant->m_regex, pQuant->m_cMic);
 	}
 
 	if(pQuant->m_cMac == -1)
 	{
-		if(nfa.m_pStateBegin)
+		if(frag.m_pStateBegin)
 		{
-			nfa.Patch(FragCreateStar(&pQuant->m_regex));
+			frag.Patch(FragCreateStar(&pQuant->m_regex));
 		}
 		else
 		{
-			nfa = FragCreateStar(&pQuant->m_regex);
+			frag = FragCreateStar(&pQuant->m_regex);
 		}
 
-		return nfa;
+		return frag;
 	}
 
 	if(pQuant->m_cMac <= pQuant->m_cMic)
 	{
-		assert(nfa.m_pStateBegin);
-		return nfa;
+		assert(frag.m_pStateBegin);
+		return frag;
 	}
 
-	if(nfa.m_pStateBegin)
+	if(frag.m_pStateBegin)
 	{
-		nfa.Patch(FragCreateCountOptional(&pQuant->m_regex, pQuant->m_cMac - pQuant->m_cMic));
+		frag.Patch(FragCreateCountOptional(&pQuant->m_regex, pQuant->m_cMac - pQuant->m_cMic));
 	}
 	else
 	{
-		nfa = FragCreateCountOptional(&pQuant->m_regex, pQuant->m_cMac - pQuant->m_cMic);
+		frag = FragCreateCountOptional(&pQuant->m_regex, pQuant->m_cMac - pQuant->m_cMic);
 	}
 
-	return nfa;
+	return frag;
 }
 
 CNfa::SNfaFragment CNfa::FragFromRange(const SRangeRegexData * pRange)
 {
-	CNfaState * pNfasOr = PStateCreate();
+	CNfaState * fragUnion = PStateCreate();
 
 	for(int iChr = pRange->m_chrMic; iChr <= pRange->m_chrMac; ++iChr)
 	{
-		CNfaState * pNfasChr = PStateCreate();
-		pNfasChr->AddChrTransition(iChr, CNfa::PStateEmpty());
+		CNfaState * pState = PStateCreate();
+		pState->AddChrTransition(iChr, CNfa::PStateEmpty());
 
-		pNfasOr->AddEpsilonTransition(pNfasChr);
+		fragUnion->AddEpsilonTransition(pState);
 	}
 
-	return SNfaFragment(pNfasOr, pNfasOr->m_arypStateTransitionEpsilon);
+	return SNfaFragment(fragUnion, fragUnion->m_arypStateTransitionEpsilon);
 }
 
 CNfa::SNfaFragment CNfa::FragFromChr(const SChrRegexData * pRegexchr)
 {
-	CNfaState * pNfasChr = PStateCreate();
-	pNfasChr->AddChrTransition(pRegexchr->m_chr, CNfa::PStateEmpty());
+	CNfaState * pState = PStateCreate();
+	pState->AddChrTransition(pRegexchr->m_chr, CNfa::PStateEmpty());
 
-	return SNfaFragment(pNfasChr, { pNfasChr });
+	return SNfaFragment(pState, { pState });
 }
 
-CNfa::SNfaFragment CNfa::FragCreateCount(const SRegexAstNode * pRegex, int c)
+CNfa::SNfaFragment CNfa::FragCreateCount(const SRegexAstNode * pRegex, size_t c)
 {
-	CNfa::SNfaFragment nfa = FragFromRegex(pRegex);
+	CNfa::SNfaFragment frag = FragFromRegex(pRegex);
 
 	for(size_t iC = 1; iC < c; ++iC)
 	{
-		nfa.Patch(FragFromRegex(pRegex));
+		frag.Patch(FragFromRegex(pRegex));
 	}
 
-	return nfa;
+	return frag;
 }
 
 CNfa::SNfaFragment CNfa::FragCreateStar(const SRegexAstNode * pRegex)
 {
 	// create a ?
 	
-	CNfaState * pNfasOr = PStateCreate();
-	SNfaFragment nfa = FragFromRegex(pRegex);
-	pNfasOr->AddEpsilonTransition(nfa.m_pStateBegin);
-	pNfasOr->AddEpsilonTransition(nullptr);
+	CNfaState * pState = PStateCreate();
+	SNfaFragment frag = FragFromRegex(pRegex);
+	pState->AddEpsilonTransition(frag.m_pStateBegin);
+	pState->AddEpsilonTransition(nullptr);
 
 	// the final nfa will only have one unpatched node, the starting node, 
 	// because the nfa created from m_pregex is patched back to pOrState
 
-	SNfaFragment nfaStar(pNfasOr, { pNfasOr });
+	SNfaFragment fragStar(pState, { pState });
 
 	// loop back the nfa created from m_pregex to pOrState
 	// turning a ? into a *
 
-	nfa.Patch(nfaStar);
+	frag.Patch(fragStar);
 
-	return nfaStar;
+	return fragStar;
 }
 
 CNfa::SNfaFragment CNfa::FragCreateQMark(const SRegexAstNode * pRegex)
 {
 	// create a ?
 	
-	CNfaState * pNfasOr = PStateCreate();
-	SNfaFragment nfa = FragFromRegex(pRegex);
-	pNfasOr->AddEpsilonTransition(nfa.m_pStateBegin);
-	pNfasOr->AddEpsilonTransition(nullptr);
+	CNfaState * pState = PStateCreate();
+	SNfaFragment frag = FragFromRegex(pRegex);
+	pState->AddEpsilonTransition(frag.m_pStateBegin);
+	pState->AddEpsilonTransition(nullptr);
 
 	// the unpatched states are pOrState and all the unpatched states of
 	// the nfa created from m_pRegex
 
-	vector<CNfaState *> aryUnpatched;
-	aryUnpatched.push_back(pNfasOr);
-	aryUnpatched.insert(aryUnpatched.end(), nfa.m_arypStateUnpatched.begin(), nfa.m_arypStateUnpatched.end());
+	vector<CNfaState *> arypStateUnpatched;
+	arypStateUnpatched.push_back(pState);
+	arypStateUnpatched.insert(arypStateUnpatched.end(), frag.m_arypStateUnpatched.begin(), frag.m_arypStateUnpatched.end());
 
-	return SNfaFragment(pNfasOr, aryUnpatched);
+	return SNfaFragment(pState, arypStateUnpatched);
 }
 
-CNfa::SNfaFragment CNfa::FragCreateCountOptional(const SRegexAstNode * pRegex, int c)
+CNfa::SNfaFragment CNfa::FragCreateCountOptional(const SRegexAstNode * pRegex, size_t c)
 {
 	assert(c > 0);
 
 	// create nested ?'s, starting on the right and working
 	// back to the left to the starting node
 	
-	SNfaFragment nfaLeftMost;
+	SNfaFragment fragLeftMost;
 
-	for(int iC = c; iC > 0; --iC)
+	for(size_t iC = c; iC > 0; --iC)
 	{
-		SNfaFragment nfaQMark = FragCreateQMark(pRegex);
+		SNfaFragment fragQMark = FragCreateQMark(pRegex);
 
-		if(nfaLeftMost.m_pStateBegin)
+		if(fragLeftMost.m_pStateBegin)
 		{
-			nfaQMark.Patch(nfaLeftMost);
+			fragQMark.Patch(fragLeftMost);
 		}
 
-		nfaLeftMost = nfaQMark;
+		fragLeftMost = fragQMark;
 	}
 
-	return nfaLeftMost;
+	return fragLeftMost;
 }
 
 CNfaState * CNfa::PStateCreate()
 {
-	CNfaState * pNfas = m_poolState.PTNew<CNfaState>();
+	CNfaState * pState = m_poolState.PTNew<CNfaState>();
 
-	pNfas->m_nId = m_poolState.m_arypT.size() - 1;
+	pState->m_nId = m_poolState.m_arypT.size() - 1;
 
-	return pNfas;
+	return pState;
 }
 
 CNfaState CNfa::s_stateEmpty;

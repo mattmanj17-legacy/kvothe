@@ -83,10 +83,10 @@ private:
 	SNfaFragment				FragFromRange(const SRangeRegexData * pRange);
 	SNfaFragment				FragFromChr(const SChrRegexData * pRegexchr);
 
-	SNfaFragment				FragCreateCount(const SRegexAstNode * pRegex, int c);
+	SNfaFragment				FragCreateCount(const SRegexAstNode * pRegex, size_t c);
 	SNfaFragment				FragCreateStar(const SRegexAstNode * pRegex);
 	SNfaFragment				FragCreateQMark(const SRegexAstNode * pRegex);
-	SNfaFragment				FragCreateCountOptional(const SRegexAstNode * pRegex, int c);
+	SNfaFragment				FragCreateCountOptional(const SRegexAstNode * pRegex, size_t c);
 	
 	CNfaState *					PStateCreate();
 
