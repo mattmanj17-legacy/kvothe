@@ -47,9 +47,6 @@
     <ClInclude Include="KvotheLang\dfa.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="KvotheLang\regex.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="KvotheLang\regexparse.h">
       <Filter>Header Files</Filter>
     </ClInclude>

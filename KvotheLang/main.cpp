@@ -1,7 +1,6 @@
 #include "pool.h"
 #include "nfa.h"
 #include "dfa.h"
-#include "regex.h"
 #include "regexparse.h"
 
 int main()
