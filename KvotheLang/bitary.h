@@ -93,6 +93,7 @@ public:
 	size_t NHash() const
 	{
 		// hash is special. even if we are const, still update m_fIsHashDirty and m_hash
+		// BB(matthewd) hmm... maybe we can just call ComputeHash before we need NHash
 		
 		if(m_fIsHashDirty)
 		{

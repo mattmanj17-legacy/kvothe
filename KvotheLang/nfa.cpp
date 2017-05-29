@@ -44,13 +44,13 @@ void CNfaState::PrintDebug() const
 	}
 }
 
-void CNfaState::Patch(CNfaState * pNfas)
+void CNfaState::Patch(CNfaState * pState)
 {
 	for(size_t iEpsilonTransition = 0; iEpsilonTransition < m_arypStateTransitionEpsilon.size(); ++iEpsilonTransition)
 	{
 		if(!m_arypStateTransitionEpsilon[iEpsilonTransition])
 		{
-			m_arypStateTransitionEpsilon[iEpsilonTransition] = pNfas;
+			m_arypStateTransitionEpsilon[iEpsilonTransition] = pState;
 		}
 	}
 
@@ -58,7 +58,7 @@ void CNfaState::Patch(CNfaState * pNfas)
 	{
 		if(m_mpChrPStateTransition[iChr] == CNfa::PStateEmpty())
 		{
-			m_mpChrPStateTransition[iChr] = pNfas;
+			m_mpChrPStateTransition[iChr] = pState;
 		}
 	}
 }
@@ -118,17 +118,17 @@ CNfa::SNfaFragment::SNfaFragment()
 {
 }
 
-CNfa::SNfaFragment::SNfaFragment(CNfaState * pNfas, vector<CNfaState *> aryUnpatched)
-: m_pStateBegin(pNfas)
-, m_arypStateUnpatched(aryUnpatched)
+CNfa::SNfaFragment::SNfaFragment(CNfaState * pStateBegin, vector<CNfaState *> arypStateUnpatched)
+: m_pStateBegin(pStateBegin)
+, m_arypStateUnpatched(arypStateUnpatched)
 {
 }
 
-void CNfa::SNfaFragment::Patch(CNfa::SNfaFragment nfa)
+void CNfa::SNfaFragment::Patch(SNfaFragment frag)
 {
 	for(CNfaState * pState : m_arypStateUnpatched)
 	{
-		pState->Patch(nfa.m_pStateBegin);
+		pState->Patch(frag.m_pStateBegin);
 	}
 
 	m_arypStateUnpatched.clear();
@@ -138,7 +138,7 @@ void CNfa::SNfaFragment::Patch(CNfa::SNfaFragment nfa)
 	// so we may have already patched some of the nodes in nfa.m_arypStateUnpatched
 	// BB (matthewd) hmm.... i dont like this
 	
-	for(CNfaState * pState : nfa.m_arypStateUnpatched)
+	for(CNfaState * pState : frag.m_arypStateUnpatched)
 	{
 		if(pState->FIsUnpatched())
 		{
@@ -289,10 +289,10 @@ CNfa::SNfaFragment CNfa::FragFromRange(const SRangeRegexData * pRange)
 	return SNfaFragment(fragUnion, fragUnion->m_arypStateTransitionEpsilon);
 }
 
-CNfa::SNfaFragment CNfa::FragFromChr(const SChrRegexData * pRegexchr)
+CNfa::SNfaFragment CNfa::FragFromChr(const SChrRegexData * pChrRegex)
 {
 	CNfaState * pState = PStateCreate();
-	pState->AddChrTransition(pRegexchr->m_chr, CNfa::PStateEmpty());
+	pState->AddChrTransition(pChrRegex->m_chr, CNfa::PStateEmpty());
 
 	return SNfaFragment(pState, { pState });
 }
