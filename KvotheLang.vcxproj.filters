@@ -27,6 +27,9 @@
     <ClCompile Include="KvotheLang\regexparse.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="KvotheLang\nfa.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="KvotheLang\macros.h">

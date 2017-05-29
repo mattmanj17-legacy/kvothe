@@ -90,13 +90,15 @@ public:
 		return true;
 	}
 
-	size_t Hash()
+	size_t Hash() const
 	{
+		// hash is special. even if we are const, still update m_fIsHashDirty and m_hash
+		
 		if(m_fIsHashDirty)
 		{
-			m_fIsHashDirty = false;
+			*(const_cast<bool*>(&m_fIsHashDirty)) = false;
 			
-			MurmurHash3_x86_32(m_aryByte, m_cByte, &m_hash);
+			MurmurHash3_x86_32(m_aryByte, m_cByte, const_cast<size_t*>(&m_hash));
 		}
 
 		return m_hash;

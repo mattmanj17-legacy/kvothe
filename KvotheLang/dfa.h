@@ -49,21 +49,21 @@ Pool<SDfaState> g_poolDfas;
 
 struct NHashPDynBitAry
 {
-	size_t operator()(CDynBitAry * const tohash) const
+	size_t operator()(const CDynBitAry * const pBary) const
 	{
-		return tohash->Hash();
+		return pBary->NHash();
 	}
 };
 
 struct NEqualsPDynBitAry
 {
-	bool operator()( CDynBitAry * const lhs, CDynBitAry * const rhs ) const
+	bool operator()(const CDynBitAry * const lhs, const CDynBitAry * const rhs ) const
 	{
 		return lhs->FEquals(rhs);
 	}
 };
 
-SDfaState * DfaFromNfa(SNfaBuilder * pBuilder, SNfaState * pNfasBegin, SNfaState * pNfasEnd)
+SDfaState * DfaFromNfa(const CNfa * pBuilder)
 {
 	struct TempState
 	{
@@ -75,22 +75,24 @@ SDfaState * DfaFromNfa(SNfaBuilder * pBuilder, SNfaState * pNfasBegin, SNfaState
 		}
 		
 		SDfaState * m_pDfas;
-		CDynBitAry * m_transitions [256];
+		const CDynBitAry * m_transitions [256];
 	};
 
 	Pool<TempState> poolTempstate;
 
-	unordered_map<CDynBitAry *, TempState *, NHashPDynBitAry, NEqualsPDynBitAry> Move;
+	Pool<CDynBitAry> poolBary;
+
+	unordered_map<const CDynBitAry *, TempState *, NHashPDynBitAry, NEqualsPDynBitAry> Move;
 
 	struct Foo
 	{
-		CDynBitAry * m_pBary;
+		const CDynBitAry * m_pBary;
 		TempState * m_pTempState;
 	};
 	
 	queue<Foo> EClosureQ;
 
-	CDynBitAry * eclosureBegin = pNfasBegin->EClosure();
+	const CDynBitAry * eclosureBegin = pBuilder->PStateStart()->EpsilonClosure();
 
 	TempState * pTempStateBegin = poolTempstate.PTNew<TempState>();
 	Move[eclosureBegin] = pTempStateBegin;
@@ -110,20 +112,24 @@ SDfaState * DfaFromNfa(SNfaBuilder * pBuilder, SNfaState * pNfasBegin, SNfaState
 		{
 			if(T.m_pBary->At(iBit))
 			{
-				SNfaState * pNfas = pBuilder->PNfasFromId(iBit);
+				const CNfaState * pNfas = pBuilder->PStateFromId(iBit);
 
-				for(size_t iChr = 0; iChr < DIM(pNfas->m_transitions); ++iChr)
+				for(size_t iChr = 0; iChr < 256; ++iChr)
 				{
-					assert(pNfas->m_transitions[iChr] != nfasEmpty);
+					u8 chr = (u8)iChr;
+					
+					assert(pNfas->PStateTransition(chr) != CNfa::PStateEmpty());
 
-					if(pNfas->m_transitions[iChr])
+					if(pNfas->PStateTransition(chr))
 					{
 						if(!transitions[iChr])
 						{
-							transitions[iChr] = pBuilder->PBAryCreate();
+							CDynBitAry * pBary = poolBary.PTNew<CDynBitAry>();
+							pBary->SetSize(pBuilder->CState());
+							transitions[iChr] = pBary;
 						}
 					
-						transitions[iChr]->Set(pNfas->m_transitions[iChr]->m_nId);
+						transitions[iChr]->Set(pNfas->PStateTransition(chr)->NId());
 					}
 				}
 			}
@@ -135,15 +141,16 @@ SDfaState * DfaFromNfa(SNfaBuilder * pBuilder, SNfaState * pNfasBegin, SNfaState
 		{
 			if(transitions[iChr])
 			{
-				CDynBitAry * S = pBuilder->PBAryCreateUnpooled();
+				CDynBitAry * S = new CDynBitAry();
+				S->SetSize(pBuilder->CState());
 				
 				for(size_t iBit = 0; iBit < transitions[iChr]->C(); ++ iBit)
 				{
 					if(transitions[iChr]->At(iBit))
 					{
-						SNfaState * pNfasTran = pBuilder->PNfasFromId(iBit);
+						const CNfaState * pNfasTran = pBuilder->PStateFromId(iBit);
 
-						S->Union(pNfasTran->EClosure());
+						S->Union(pNfasTran->EpsilonClosure());
 					}
 				}
 
@@ -155,32 +162,32 @@ SDfaState * DfaFromNfa(SNfaBuilder * pBuilder, SNfaState * pNfasBegin, SNfaState
 				{
 					// key already exists
 
-					CDynBitAry * SOld = S;
-					S = lb->first;
-					delete SOld;
+					delete S;
+
+					pTempState->m_transitions[iChr] = lb->first;
 				}
 				else
 				{
 					// the key does not exist in the map
 					// Use lb as a hint to insert, so we can avoid another lookup
 
-					pBuilder->AddToPool(S);
+					poolBary.m_arypT.push_back(S);
 
 					TempState * pTempState = poolTempstate.PTNew<TempState>();
 
 					Move.insert(lb, MapType::value_type(S, pTempState));
 
 					EClosureQ.push(Foo { S,  pTempState });
-				}
 
-				pTempState->m_transitions[iChr] = S;
+					pTempState->m_transitions[iChr] = S;
+				}
 			}
 		}
 	}
 
-	for(pair<CDynBitAry *, TempState *> move : Move)
+	for(pair<const CDynBitAry *, TempState *> move : Move)
 	{
-		CDynBitAry * eclosure = move.first;
+		const CDynBitAry * eclosure = move.first;
 		TempState * pTempState = move.second;
 		
 		pTempState->m_pDfas = g_poolDfas.PTNew<SDfaState>();
@@ -189,9 +196,9 @@ SDfaState * DfaFromNfa(SNfaBuilder * pBuilder, SNfaState * pNfasBegin, SNfaState
 		{
 			if(eclosure->At(iBit))
 			{
-				SNfaState * pNfas = pBuilder->PNfasFromId(iBit);
+				const CNfaState * pNfas = pBuilder->PStateFromId(iBit);
 
-				if(pNfas == pNfasEnd)
+				if(pNfas == pBuilder->PStateAccept())
 				{
 					pTempState->m_pDfas->m_fIsFinal = true;
 					break;
@@ -200,7 +207,7 @@ SDfaState * DfaFromNfa(SNfaBuilder * pBuilder, SNfaState * pNfasBegin, SNfaState
 		}
 	}
 
-	for(pair<CDynBitAry *, TempState *> move : Move)
+	for(pair<const CDynBitAry *, TempState *> move : Move)
 	{
 		for(size_t iChr = 0; iChr < DIM(move.second->m_transitions); ++iChr)
 		{

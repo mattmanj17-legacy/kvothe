@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="KvotheLang\murmurhash.cpp" />
     <ClCompile Include="KvotheLang\main.cpp" />
+    <ClCompile Include="KvotheLang\nfa.cpp" />
     <ClCompile Include="KvotheLang\regexparse.cpp" />
   </ItemGroup>
   <ItemGroup>

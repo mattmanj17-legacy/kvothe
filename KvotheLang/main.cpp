@@ -1,19 +1,16 @@
 #include "pool.h"
+#include "regexparse.h"
 #include "nfa.h"
 #include "dfa.h"
-#include "regexparse.h"
 
 int main()
 {
-	SNfaState s;
-	nfasEmpty = &s;
+	CNfaState s;
 	
 	SDfaState * pDfas = nullptr;
-	
-	SNfaBuilder nfaBuilder;
 
 	{
-		SNfaFragment nfa;
+		CNfa nfaBuilder;
 	
 		{
 			const char * pChzFileName = "example.regex";
@@ -26,16 +23,10 @@ int main()
 
 			fclose(pFile);
 
-			nfa =  nfaBuilder.NfafragFromRegex(parser.PRegexAstParsed());
+			nfaBuilder.Build(parser.PRegexAstParsed());
 		}
 
-		SNfaState * pStateAccept = nfaBuilder.PNfasCreate();
-
-		nfa.Patch(SNfaFragment(pStateAccept, {}));
-
-		nfaBuilder.Bake();
-
-		pDfas = DfaFromNfa(&nfaBuilder, nfa.m_pStateBegin, pStateAccept);
+		pDfas = DfaFromNfa(&nfaBuilder);
 	}
 
 	g_poolDfas.Clear();
