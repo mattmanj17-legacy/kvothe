@@ -3,7 +3,7 @@
 #include "bitary.h"
 #include "regexparse.h"
 
-struct CNfaState
+class CNfaState
 {
 	friend class CNfa;
 
@@ -46,7 +46,7 @@ class CNfa
 {	
 public:
 
-	void						PrintDebug();
+	void						PrintDebug() const;
 	
 	// convert a regex to an nfa
 
@@ -75,7 +75,7 @@ private:
 	struct SNfaFragment
 	{
 								SNfaFragment();
-								SNfaFragment(CNfaState * pNfas, vector<CNfaState *> aryUnpatched);
+								SNfaFragment(CNfaState * pStateBegin, vector<CNfaState *> aryUnpatched);
 
 		void					Patch(SNfaFragment frag); // set all dangling transitions the start state of another frag 
 

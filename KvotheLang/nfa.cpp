@@ -17,7 +17,6 @@ CNfaState::CNfaState()
 
 void CNfaState::PrintDebug() const
 {
-	printf("\n");
 	printf("state %d:\n", m_nId);
 
 	printf("transitions:");
@@ -30,6 +29,7 @@ void CNfaState::PrintDebug() const
 			printf("%d '%c' -> %d", iChr, iChr, m_mpChrPStateTransition[iChr]->m_nId);
 		}
 	}
+
 	printf("\n");
 
 	if(m_arypStateTransitionEpsilon.size() > 0)
@@ -40,7 +40,6 @@ void CNfaState::PrintDebug() const
 			assert(nfas);
 			printf(" %d", nfas->m_nId);
 		}
-		printf("\n");
 	}
 }
 
@@ -110,6 +109,8 @@ void CNfaState::ComputeEpsilonClosure(int cState)
 			}
 		}
 	}
+
+	m_baryEpsilonClosure.ComputeHash();
 }
 
 CNfa::SNfaFragment::SNfaFragment()
@@ -147,9 +148,15 @@ void CNfa::SNfaFragment::Patch(SNfaFragment frag)
 	}
 }
 
-void CNfa::PrintDebug()
+void CNfa::PrintDebug() const
 {
-	// todo
+	printf("start state: %d", m_pStateStart->m_nId);
+
+	for(CNfaState * pState : m_poolState.m_arypT)
+	{
+		printf("\n");
+		pState->PrintDebug();
+	}
 }
 
 void CNfa::Build(const SRegexAstNode * pRegex)
@@ -276,6 +283,8 @@ CNfa::SNfaFragment CNfa::FragFromQuant(const SQuantifierRegexData * pQuant)
 
 CNfa::SNfaFragment CNfa::FragFromRange(const SRangeRegexData * pRange)
 {
+	// BB(matthewd) just return a state with many transitions, not a union of states with one transition
+	
 	CNfaState * fragUnion = PStateCreate();
 
 	for(int iChr = pRange->m_chrMic; iChr <= pRange->m_chrMac; ++iChr)

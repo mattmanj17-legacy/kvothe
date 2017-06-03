@@ -32,7 +32,7 @@ struct SRegexAstNode
 									{
 									}
 	
-	void							PrintDebug();
+	void							PrintDebug() const;
 	
 	// regex data
 	

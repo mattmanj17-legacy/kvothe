@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="KvotheLang\dfa.cpp" />
     <ClCompile Include="KvotheLang\murmurhash.cpp" />
     <ClCompile Include="KvotheLang\main.cpp" />
     <ClCompile Include="KvotheLang\nfa.cpp" />

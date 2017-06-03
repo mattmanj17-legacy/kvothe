@@ -90,17 +90,19 @@ public:
 		return true;
 	}
 
-	size_t NHash() const
+	void ComputeHash()
 	{
-		// hash is special. even if we are const, still update m_fIsHashDirty and m_hash
-		// BB(matthewd) hmm... maybe we can just call ComputeHash before we need NHash
-		
 		if(m_fIsHashDirty)
 		{
-			*(const_cast<bool*>(&m_fIsHashDirty)) = false;
+			m_fIsHashDirty = false;
 			
-			MurmurHash3_x86_32(m_aryByte, m_cByte, const_cast<size_t*>(&m_hash));
+			MurmurHash3_x86_32(m_aryByte, m_cByte, &m_hash);
 		}
+	}
+
+	size_t NHash() const
+	{
+		assert(!m_fIsHashDirty);
 
 		return m_hash;
 	}
@@ -112,6 +114,8 @@ public:
 
 	void Union(const CDynBitAry * other)
 	{
+		// BB(matthewd) this would be a little faster if m_aryByte was m_aryU32/64 instead
+		
 		assert(C() == other->C());
 		
 		for(size_t iByte = 0; iByte < m_cByte; ++iByte)

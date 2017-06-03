@@ -30,6 +30,9 @@
     <ClCompile Include="KvotheLang\nfa.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="KvotheLang\dfa.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="KvotheLang\macros.h">

@@ -6,7 +6,7 @@
 #include <string>
 using std::string;
 
-void SRegexAstNode::PrintDebug()
+void SRegexAstNode::PrintDebug() const
 {
 	switch (m_regexk)
 	{

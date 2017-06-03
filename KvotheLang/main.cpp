@@ -4,32 +4,27 @@
 #include "dfa.h"
 
 int main()
-{
-	CNfaState s;
-	
-	SDfaState * pDfas = nullptr;
-
-	{
-		CNfa nfaBuilder;
-	
-		{
-			const char * pChzFileName = "example.regex";
-
-			FILE * pFile = fopen(pChzFileName, "r");
+{	
+	const char * pChzFileName = "example.regex";
+	FILE * pFile = fopen(pChzFileName, "r");
 			
-			CRegexParser parser;
-			
-			parser.ParseFile(pFile);
+	CRegexParser parser;
+	parser.ParseFile(pFile);
+	parser.PRegexAstParsed()->PrintDebug();
 
-			fclose(pFile);
+	printf("\n\n");
 
-			nfaBuilder.Build(parser.PRegexAstParsed());
-		}
+	fclose(pFile);
 
-		pDfas = DfaFromNfa(&nfaBuilder);
-	}
+	CNfa nfa;
+	nfa.Build(parser.PRegexAstParsed());
+	nfa.PrintDebug();
 
-	g_poolDfas.Clear();
+	printf("\n\n");
+
+	CDfa dfa;
+	dfa.Build(&nfa);
+	dfa.PrintDebug();
 
 	return 0;
 }
