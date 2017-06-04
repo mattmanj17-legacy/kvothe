@@ -45,7 +45,7 @@ CDfa::CDfa()
 
 void CDfa::PrintDebug() const
 {
-	printf("start state: %d", m_pStateStart->m_nId);
+	printf("start state: %d\n", m_pStateStart->m_nId);
 
 	for(SDfaState * pState : m_poolState.m_arypT)
 	{
@@ -100,7 +100,7 @@ void CDfa::Build(const CNfa * pNfa)
 	// pools for all of the Temp states and bit arrays we will need
 	
 	Pool<SDfaStateTemp>		poolTempstate;
-	Pool<CDynBitAry>		poolBary;
+	Pool<CDynBitAry>		poolBaryEClosure;
 
 	// map from epsilon closure to temp state
 	
@@ -136,6 +136,15 @@ void CDfa::Build(const CNfa * pNfa)
 	// scratch space for computing transitions
 	
 	CDynBitAry * transitions [256];
+	for(int iTran = 0; iTran < DIM(transitions); ++ iTran)
+	{
+		CDynBitAry * pBary = new CDynBitAry();
+		pBary->SetSize(pNfa->CState());
+		transitions[iTran] = pBary;
+	}
+
+	CDynBitAry baryHasTran;
+	baryHasTran.SetSize(256);
 
 	while(tempStatesToProcess.size() > 0)
 	{
@@ -146,7 +155,12 @@ void CDfa::Build(const CNfa * pNfa)
 	
 		// clear the transitions array
 		
-		memset(transitions, 0, DIM(transitions) * sizeof(CDynBitAry *));
+		for (CDynBitAry * pBary : transitions)
+		{
+			pBary->Clear();
+		}
+
+		baryHasTran.Clear();
 
 		// compute the transitions for this temp state
 		
@@ -168,11 +182,9 @@ void CDfa::Build(const CNfa * pNfa)
 
 					if(pNfaState->PStateTransition(chr))
 					{
-						if(!transitions[iChr])
+						if(!baryHasTran.At(iChr))
 						{
-							CDynBitAry * pBary = poolBary.PTNew<CDynBitAry>();
-							pBary->SetSize(pNfa->CState());
-							transitions[iChr] = pBary;
+							baryHasTran.Set(iChr);
 						}
 				
 						transitions[iChr]->Set(pNfaState->PStateTransition(chr)->NId());
@@ -185,7 +197,7 @@ void CDfa::Build(const CNfa * pNfa)
 		{
 			// for each char that this temp state transitions on
 			
-			if(transitions[iChr])
+			if(baryHasTran.At(iChr))
 			{
 				// construct the epsilon closure of the node we are transitioning to
 				// say we are transioning on the char 'a'. we are looking for aE*, or
@@ -233,11 +245,11 @@ void CDfa::Build(const CNfa * pNfa)
 
 					// create a new temp state for this set of nfa states
 
-					poolBary.m_arypT.push_back(aEStar);
+					poolBaryEClosure.m_arypT.push_back(aEStar);
 
 					SDfaStateTemp * pTempStateNew = poolTempstate.PTNew<SDfaStateTemp>();
 					pTempStateNew->m_pBary = aEStar;
-					pTempStateBegin->m_nId = poolTempstate.m_arypT.size() - 1;
+					pTempStateNew->m_nId = poolTempstate.m_arypT.size() - 1;
 
 					tempStateMap.insert(lb, TempStateMap::value_type(aEStar, pTempStateNew));
 
@@ -251,6 +263,11 @@ void CDfa::Build(const CNfa * pNfa)
 				}
 			}
 		}
+	}
+
+	for(int iTran = 0; iTran < DIM(transitions); ++ iTran)
+	{
+		delete transitions[iTran];
 	}
 
 	for(pair<const CDynBitAry *, SDfaStateTemp *> kvp : tempStateMap)
@@ -304,4 +321,7 @@ void CDfa::Build(const CNfa * pNfa)
 	);
 
 	m_pStateStart = pTempStateBegin->m_pDfaState;
+
+	poolTempstate.Clear();
+	poolBaryEClosure.Clear();
 }

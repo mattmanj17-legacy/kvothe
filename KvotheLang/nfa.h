@@ -55,7 +55,7 @@ public:
 	const CNfaState *			PStateStart() const 
 									{ return m_pStateStart; }
 	const CNfaState *			PStateAccept() const 
-									{ return m_pStateStart; }
+									{ return m_pStateEnd; }
 
 	const CNfaState *			PStateFromId(int nId) const
 									{ return m_poolState.m_arypT[nId]; }

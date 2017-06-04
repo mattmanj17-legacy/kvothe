@@ -48,7 +48,7 @@ public:
 
 		m_aryByte = new u8[m_cByte];
 
-		memset(m_aryByte, 0, sizeof(u8) * m_cByte);
+		Clear();
 	}
 
 	bool At(size_t iBit) const
@@ -124,6 +124,11 @@ public:
 		}
 
 		m_fIsHashDirty = true;
+	}
+
+	void Clear()
+	{
+		memset(m_aryByte, 0, m_cByte);
 	}
 	
 private:
