@@ -35,6 +35,7 @@ protected:
 	struct SPartition // partition 
 	{
 					SPartition(int cElem);
+					~SPartition();
 
 		void		MarkElem(int iElem);		// mark
 		void		Split();					// split
@@ -46,9 +47,9 @@ protected:
 		int*		m_mpISetIElemMic;			// F. begining of set S
 		int*		m_mpISetIElemMax;			// P. end of set S
 
-		static int*	s_mpISetCMarked;			// M. the number of marked elements in a set. numMarkedInS = M[s]
-		static int*	s_aISetTouched;				// W. touched sets and count of touched sets
-		static int	s_cSetTouched;				// w. ... 
+		int*		m_mpISetCMarked;			// M. the number of marked elements in a set. numMarkedInS = M[s]
+		int*		m_aISetTouched;				// W. touched sets and count of touched sets
+		int			m_cSetTouched;				// w. ... 
 	};
 
 	SPartition*	m_pPartStates;			// B. partition of states (blocks)

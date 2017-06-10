@@ -66,28 +66,20 @@ void CDfaMinimizer::DfaMinMain()
 	// rem_unreachable(H, T);
 	RemoveUnreachable(m_mpITranIStateTo, m_mpITranIStateFrom);
 
-	// allocate enough scrate space for marking operation
-	// g_cState <= g_cTran + 1, because unreachable states have been removed
-	// so g_cTran + 1 is sufficent space
-
-	SPartition::s_aISetTouched = new int[m_cTran + 1]; // W = new int[mm + 1];
-	SPartition::s_mpISetCMarked = new int[m_cTran + 1]; // M = new int[mm + 1];
-	SPartition::s_cSetTouched = 0; // init s_cSetTouched
-
 	// mark the final states
 	// this works because the final states will be at the front of the array
 	// after we are done removing irrelevant states
 
 	// M[0] = ff;
-	SPartition::s_mpISetCMarked[0] = m_cStateFinal;
+	m_pPartStates->m_mpISetCMarked[0] = m_cStateFinal;
 
 	// if g_cStateFinal == 0, then this is the empty language and has no states
 	
 	if (m_cStateFinal > 0) // if (ff)
 	{ 
 		// W[w++] = 0;
-		SPartition::s_aISetTouched[SPartition::s_cSetTouched] = 0; 
-		++SPartition::s_cSetTouched;
+		m_pPartStates->m_aISetTouched[m_pPartStates->m_cSetTouched] = 0; 
+		++m_pPartStates->m_cSetTouched;
 
 		// split into final and non final states
 
@@ -129,7 +121,7 @@ void CDfaMinimizer::DfaMinMain()
 		// make sure set 0 is init'ed
 
 		// M[0] = 0;
-		SPartition::s_mpISetCMarked[0] = 0;
+		m_pPartTrans->m_mpISetCMarked[0] = 0;
 
 		// get the label of the first transition
 		
@@ -167,7 +159,7 @@ void CDfaMinimizer::DfaMinMain()
 				// init the marked count for this new set
 
 				// M[C.z] = 0;
-				SPartition::s_mpISetCMarked[m_pPartTrans->m_cSet] = 0;
+				m_pPartTrans->m_mpISetCMarked[m_pPartTrans->m_cSet] = 0;
 			}
 
 			// put this transition in the current set
@@ -402,12 +394,6 @@ void CDfaMinimizer::DfaMinMain()
 	delete [] m_mpIStateITranMic;
 	m_mpIStateITranMic = nullptr;
 
-	delete [] SPartition::s_aISetTouched;
-	SPartition::s_aISetTouched = nullptr;
-
-	delete [] SPartition::s_mpISetCMarked;
-	SPartition::s_mpISetCMarked = nullptr;
-
 	delete m_pPartStates;
 	m_pPartStates = nullptr;
 
@@ -441,6 +427,10 @@ CDfaMinimizer::SPartition::SPartition(int cElem)
 
 	m_mpISetIElemMic[0] = 0; // F[0] = 0;
 	m_mpISetIElemMax[0] = cElem; // P[0] = n;
+
+	m_mpISetCMarked = new int[cElem];
+	m_aISetTouched = new int[cElem];
+	m_cSetTouched = 0;
 }
 
 CDfaMinimizer::SPartition::~SPartition()
@@ -450,6 +440,8 @@ CDfaMinimizer::SPartition::~SPartition()
 	delete m_mpIElemISet;
 	delete m_mpISetIElemMic;
 	delete m_mpISetIElemMax;
+	delete m_mpISetCMarked;
+	delete m_aISetTouched;
 }
 
 void CDfaMinimizer::SPartition::MarkElem(int iElem) 
@@ -462,11 +454,11 @@ void CDfaMinimizer::SPartition::MarkElem(int iElem)
 	// mark this set as touched if this is the first element in it we are marking
 	
 	// if (!M[s]) . we do M[s]++ below
-	if(s_mpISetCMarked[iSet] == 0)
+	if(m_mpISetCMarked[iSet] == 0)
 	{
 		// W[w++] = s;
-		s_aISetTouched[s_cSetTouched] = iSet;
-		++s_cSetTouched;
+		m_aISetTouched[m_cSetTouched] = iSet;
+		++m_cSetTouched;
 	}
 
 	// i = L[e]
@@ -476,7 +468,7 @@ void CDfaMinimizer::SPartition::MarkElem(int iElem)
 	// so, the index of first unmarked element is F[s] + M[s]
 
 	// j = F[s] + M[s];
-	int iElemFirstUnmarked = m_mpISetIElemMic[iSet] + s_mpISetCMarked[iSet];
+	int iElemFirstUnmarked = m_mpISetIElemMic[iSet] + m_mpISetCMarked[iSet];
 
 	// mark elem by swapping it with the first unmarked element and incrementing cMarked
 	
@@ -487,7 +479,7 @@ void CDfaMinimizer::SPartition::MarkElem(int iElem)
 	m_mpIElemIElemInPartition[iElem] = iElemFirstUnmarked; // L[e] = j;
 
 	// M[s]++
-	++s_mpISetCMarked[iSet];
+	++m_mpISetCMarked[iSet];
 }
 
 void CDfaMinimizer::SPartition::Split() 
@@ -495,15 +487,15 @@ void CDfaMinimizer::SPartition::Split()
 	// for each touched set...
 
 	// while (w)
-	while (s_cSetTouched) 
+	while (m_cSetTouched) 
 	{
-		--s_cSetTouched;
+		--m_cSetTouched;
 
 		// int s = W[--w],
-		int iSetTouched = s_aISetTouched[s_cSetTouched];
+		int iSetTouched = m_aISetTouched[m_cSetTouched];
 
 		// j = F[s] + M[s];
-		int	iElemFirstUnmarked = m_mpISetIElemMic[iSetTouched] + s_mpISetCMarked[iSetTouched];
+		int	iElemFirstUnmarked = m_mpISetIElemMic[iSetTouched] + m_mpISetCMarked[iSetTouched];
 
 		// P[s]
 		int iElemMax = m_mpISetIElemMax[iSetTouched];
@@ -515,7 +507,7 @@ void CDfaMinimizer::SPartition::Split()
 			// if all elements are marked, just un mark them and go to the next set
 			// because we are only looking at touched sets, we know at least one element is marked
 
-			s_mpISetCMarked[iSetTouched] = 0; // M[s] = 0;
+			m_mpISetCMarked[iSetTouched] = 0; // M[s] = 0;
 			continue; 
 		}
 
@@ -532,7 +524,7 @@ void CDfaMinimizer::SPartition::Split()
 		int cUnmarked = iElemMax - iElemFirstUnmarked;
 		
 		// if (M[s] <= P[s] - j)
-		if (s_mpISetCMarked[iSetTouched] <= cUnmarked) 
+		if (m_mpISetCMarked[iSetTouched] <= cUnmarked) 
 		{
 			// the new set is the marked elements 
 			
@@ -567,19 +559,15 @@ void CDfaMinimizer::SPartition::Split()
 		// unmark the elements in the current set
 
 		// M[s] = 0;
-		s_mpISetCMarked[iSetTouched] = 0;
+		m_mpISetCMarked[iSetTouched] = 0;
 
 		// the new set begins untouched (all elements unmarked)
 
 		// M[z++] = 0;
-		s_mpISetCMarked[m_cSet] = 0;
+		m_mpISetCMarked[m_cSet] = 0;
 		++m_cSet;
 	}
 }
-
-int* CDfaMinimizer::SPartition::s_mpISetCMarked;
-int* CDfaMinimizer::SPartition::s_aISetTouched;
-int CDfaMinimizer::SPartition::s_cSetTouched;
 
 void CDfaMinimizer::SetAdjacentTrans(int mpITranIState[]) 
 {
