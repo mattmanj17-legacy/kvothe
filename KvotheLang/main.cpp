@@ -3,7 +3,7 @@
 #include "nfa.h"
 #include "dfa.h"
 
-int main()
+int local_main()
 {	
 	const char * pChzFileName = "example.regex";
 	FILE * pFile = fopen(pChzFileName, "r");
