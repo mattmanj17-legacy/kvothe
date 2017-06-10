@@ -19,8 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="dfamin.cpp" />
     <ClCompile Include="KvotheLang\dfa.cpp" />
+    <ClCompile Include="KvotheLang\dfamin.cpp" />
     <ClCompile Include="KvotheLang\murmurhash.cpp" />
     <ClCompile Include="KvotheLang\main.cpp" />
     <ClCompile Include="KvotheLang\nfa.cpp" />
@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClInclude Include="KvotheLang\bitary.h" />
     <ClInclude Include="KvotheLang\dfa.h" />
+    <ClInclude Include="KvotheLang\dfamin.h" />
     <ClInclude Include="KvotheLang\macros.h" />
     <ClInclude Include="KvotheLang\murmurhash.h" />
     <ClInclude Include="KvotheLang\nfa.h" />
