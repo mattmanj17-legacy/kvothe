@@ -2,6 +2,7 @@
 #include "regexparse.h"
 #include "nfa.h"
 #include "dfa.h"
+#include "dfamin.h"
 
 int main()
 {	
@@ -16,7 +17,7 @@ int main()
 
 	fclose(pFile);
 
-	//printf("\n\nNFA:\n\n");
+	printf("\n\nNFA:\n\n");
 
 	CNfa nfa;
 	nfa.Build(parser.PRegexAstParsed());
@@ -27,6 +28,14 @@ int main()
 	CDfa dfa;
 	dfa.Build(&nfa);
 	//dfa.PrintDebug();
+
+	CDfa dfaMin;
+
+	CDfaMinimizer dfaminimizer;
+
+	dfaminimizer.Minimize(dfa, dfaMin);
+
+	//dfaMin.PrintDebug();
 
 	return 0;
 }

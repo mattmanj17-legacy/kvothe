@@ -17,6 +17,8 @@ struct SDfaState // tag = dfas
 
 class CDfa
 {
+	friend class CDfaMinimizer;
+
 public:
 						CDfa();
 
@@ -24,7 +26,7 @@ public:
 
 	void				Build(const CNfa * pNfa);
 	
-	const SDfaState *	PStateStart()
+	const SDfaState *	PStateStart() const
 							{ return m_pStateStart; }
 private:
 

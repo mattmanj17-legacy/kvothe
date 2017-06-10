@@ -1,6 +1,7 @@
 #pragma once
 
-//#include "dfa.h"
+#include "dfa.h"
+#include "types.h"
 
 class CDfaMinimizer
 {
@@ -20,7 +21,7 @@ public:
 				, m_cStateReached(0)
 				{ ; }
 
-	void		DfaMinMain();
+	void		Minimize(const CDfa & dfaIn, CDfa & dfaOut);
 
 protected:
 
@@ -60,7 +61,7 @@ protected:
 	int			m_cStateFinal;			// ff. number of final states
 	int			m_iStateInitial;		// q0. initial state
 	int*		m_mpITranIStateFrom;	// T. tails of transitions
-	int*		m_mpITranLabel;			// L. labels of transitions
+	u8*			m_mpITranLabel;			// L. labels of transitions
 	int*		m_mpITranIStateTo;		// H. heads of transitions
 
 	// Outgoing/incoming transitions from states

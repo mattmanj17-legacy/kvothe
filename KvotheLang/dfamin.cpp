@@ -1,34 +1,61 @@
 #include "dfamin.h"
+#include "macros.h"
 
 /* Code below reproduced from "Fast brief practical DFA minimization" by Antti Valmari (2011) */
 // https://www.cs.cmu.edu/~cdm/pdf/Valmari12.pdf
 
-#include <iostream>
 #include <algorithm> 
 #include <assert.h>
 
 // Main program
 
-void CDfaMinimizer::DfaMinMain() 
+void CDfaMinimizer::Minimize(const CDfa & dfaIn, CDfa & dfaOut) 
 {
-	// Read sizes and reserve most memory
+	m_cState = dfaIn.m_poolState.m_arypT.size();
+	m_iStateInitial = dfaIn.PStateStart()->m_nId;
+
+	// count transitions and final states
 	
-	// std::cin >> nn >> mm >> q0 >> ff;
-	std::cin >> m_cState >> m_cTran >> m_iStateInitial >> m_cStateFinal;
+	m_cTran = 0;
+	m_cStateFinal = 0;
+	for(SDfaState * pState : dfaIn.m_poolState.m_arypT)
+	{
+		if(pState->m_fIsFinal)
+		{
+			++m_cStateFinal;
+		}
+		
+		for(SDfaState * pStateTo : pState->m_transitions)
+		{
+			if(pStateTo)
+			{
+				++m_cTran;
+			}
+		}
+	}
 
 	m_mpITranIStateFrom = new int[m_cTran]; // T = new int[mm];
-	m_mpITranLabel = new int[m_cTran]; // L = new int[mm];
+	m_mpITranLabel = new u8[m_cTran]; // L = new int[mm];
 	m_mpITranIStateTo = new int[m_cTran]; // H = new int[mm];
 	m_pPartStates = new SPartition(m_cState); // B.init(nn);
 	m_aITran = new int[m_cTran]; // A = new int[mm];
 	m_mpIStateITranMic = new int[m_cState + 1]; // F = new int[nn + 1];
 
-	// Read transitions
-
-	for (int iTran = 0; iTran < m_cTran; ++iTran) // for (int t = 0; t < mm; ++t)
+	int iTran = 0;
+	for(SDfaState * pState : dfaIn.m_poolState.m_arypT)
 	{
-		// std::cin >> T[t] >> L[t] >> H[t];
-		std::cin >> m_mpITranIStateFrom[iTran] >> m_mpITranLabel[iTran] >> m_mpITranIStateTo[iTran];
+		for(int iChr = 0; iChr < DIM(pState->m_transitions); ++iChr)
+		{
+			SDfaState * pStateTo = pState->m_transitions[iChr];
+
+			if(pStateTo)
+			{
+				m_mpITranIStateFrom[iTran] = pState->m_nId;
+				m_mpITranLabel[iTran] = (u8)iChr;
+				m_mpITranIStateTo[iTran] = pStateTo->m_nId;
+				++iTran;
+			}
+		}
 	}
 
 	// Remove states that cannot be reached from the initial state
@@ -36,25 +63,22 @@ void CDfaMinimizer::DfaMinMain()
 	MarkReached(m_iStateInitial); // reach(q0);
 	RemoveUnreachable(m_mpITranIStateFrom, m_mpITranIStateTo); // rem_unreachable(T, H);
 
-	for (int cStateFinal = 0; cStateFinal < m_cStateFinal; ++cStateFinal) // for (int i = 0; i < ff; ++i)
+	for(SDfaState * pState : dfaIn.m_poolState.m_arypT)
 	{
-		// read in final state
-		
-		// int q; 
-		int iStateFinal;
+		if(pState->m_fIsFinal)
+		{
+			int iStateFinal = pState->m_nId;
 
-		// std::cin >> q;
-		std::cin >> iStateFinal; 
+			// mark final state as reached (if it is reachable from the start state)
 
-		// mark final state as reached (if it is reachable from the start state)
-
-		// if (B.L[q] < B.P[0])
-		if (m_pPartStates->m_mpIElemIElemInPartition[iStateFinal] < m_pPartStates->m_mpISetIElemMax[0]) 
-		{ 
-			// note : this also moves this final state to the front of the array
+			// if (B.L[q] < B.P[0])
+			if (m_pPartStates->m_mpIElemIElemInPartition[iStateFinal] < m_pPartStates->m_mpISetIElemMax[0]) 
+			{ 
+				// note : this also moves this final state to the front of the array
 			
-			// reach(q);
-			MarkReached(iStateFinal); 
+				// reach(q);
+				MarkReached(iStateFinal); 
+			}
 		}
 	}
 	
@@ -261,73 +285,16 @@ void CDfaMinimizer::DfaMinMain()
 		}
 	}
 
-	// Count the numbers of transitions in the result
-	// for each transition...
+	dfaOut.m_poolState.Clear();
 
-	// int mo = 0
-	int cTranResult = 0; 
-	for (int cTran = 0; cTran < m_cTran; ++cTran) // for (int t = 0; t < mm; ++t) 
+	for(int iState = 0; iState < m_pPartStates->m_cSet; ++iState)
 	{
-		int iStateFrom = m_mpITranIStateFrom[cTran];
-		int iSet = m_pPartStates->m_mpIElemISet[iStateFrom];
-
-		int iStateInPartitionFrom = m_pPartStates->m_mpIElemIElemInPartition[iStateFrom];
-		int iStateInPartitionMic = m_pPartStates->m_mpISetIElemMic[iSet];
-
-		// if this transision's from state is the first state in a block, inc cTranResult
-		// this works because for all states in a block, they all transition to the same block on a given label
-		// so we are effectivly combining redundant transitions from on block to another
-		
-		// if (B.L[T[t]] == B.F[B.S[T[t]]])
-		if (iStateInPartitionFrom == iStateInPartitionMic) 
-		{
-			// ++mo;
-			++cTranResult;
-		}
+		SDfaState * pState = dfaOut.m_poolState.PTNew<SDfaState>();
+		pState->m_nId = iState;
 	}
 
-	// Count the numbers of final states in the result
-	// for each set (block of states)
-
-	// int fo = 0;
-	int cStateFinalResult = 0;
-	for (int cSet = 0; cSet < m_pPartStates->m_cSet; ++cSet) // for (int b = 0; b < B.z; ++b)
-	{
-		// if the first state in this set is final, then all states in this set are final 
-		// so this set if final, so inc cStateFinalResult
-		
-		bool fIsSetFinal = m_pPartStates->m_mpISetIElemMic[cSet] < m_cStateFinal;
-
-		if (fIsSetFinal) // if (B.F[b] < ff) 
-		{ 
-			// ++fo;
-			++cStateFinalResult; 
-		}
-	}
-
-	// Print the result
-
-	// std::cout << B.z << ' ' << mo << ' ' << B.S[q0] << ' ' << fo << '\n';
-
-	// print cState
-
-	std::cout << m_pPartStates->m_cSet; 
-	std::cout << ' '; 
-
-	// print cTran
-
-	std::cout << cTranResult; 
-	std::cout << ' '; 
-
-	// print iStateInitial
-
-	std::cout << m_pPartStates->m_mpIElemISet[m_iStateInitial]; 
-	std::cout << ' '; 
-
-	 // print cStateFinal
-
-	std::cout << cStateFinalResult;
-	std::cout << '\n';
+	int iSetInitial = m_pPartStates->m_mpIElemISet[m_iStateInitial];
+	dfaOut.m_pStateStart = dfaOut.m_poolState.m_arypT[iSetInitial]; 
 
 	// for each transition
 
@@ -350,14 +317,7 @@ void CDfaMinimizer::DfaMinMain()
 		// if (B.L[T[t]] == B.F[B.S[T[t]]])
 		if (iStateInPartitionFrom == iStateInPartitionMic) 
 		{
-			// std::cout << B.S[T[t]] << ' ' << L[t] << ' ' << B.S[H[t]] << '\n';
-			
-			std::cout << iSetFrom; 
-			std::cout << ' '; 
-			std::cout << label;
-			std::cout << ' '; 
-			std::cout << iSetTo;
-			std::cout << '\n';
+			dfaOut.m_poolState.m_arypT[iSetFrom]->m_transitions[label] = dfaOut.m_poolState.m_arypT[iSetTo];
 		}
 	}
 
@@ -366,16 +326,14 @@ void CDfaMinimizer::DfaMinMain()
 	// for (int b = 0; b < B.z; ++b)
 	for (int cSet = 0; cSet < m_pPartStates->m_cSet; ++cSet) 
 	{
-		// if this set is final, print it
+		// check if this set is final
 		
 		bool fIsSetFinal = m_pPartStates->m_mpISetIElemMic[cSet] < m_cStateFinal;
 
 		// if (B.F[b] < ff)
 		if (fIsSetFinal) 
 		{
-			// std::cout << b << '\n';
-			std::cout << cSet;
-			std::cout << '\n';
+			dfaOut.m_poolState.m_arypT[cSet]->m_fIsFinal = true;
 		}
 	}
 
