@@ -2,6 +2,8 @@
 
 #include "bitary.h"
 #include "regexparse.h"
+#include <string>
+using std::string;
 
 class CNfaState
 {
@@ -108,3 +110,5 @@ private:
 
 	static CNfaState			s_stateEmpty;	// see comment on PStateEmpty
 };
+
+void MatchNfa(string str, const CNfa & nfa);

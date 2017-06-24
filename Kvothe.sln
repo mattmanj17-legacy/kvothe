@@ -7,12 +7,18 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KvotheLang", "KvotheLang.vc
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		assert|x64 = assert|x64
+		assert|x86 = assert|x86
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FCC058E6-590A-4FAF-8CDC-E42F4020EF73}.assert|x64.ActiveCfg = assert|x64
+		{FCC058E6-590A-4FAF-8CDC-E42F4020EF73}.assert|x64.Build.0 = assert|x64
+		{FCC058E6-590A-4FAF-8CDC-E42F4020EF73}.assert|x86.ActiveCfg = assert|Win32
+		{FCC058E6-590A-4FAF-8CDC-E42F4020EF73}.assert|x86.Build.0 = assert|Win32
 		{FCC058E6-590A-4FAF-8CDC-E42F4020EF73}.Debug|x64.ActiveCfg = Debug|x64
 		{FCC058E6-590A-4FAF-8CDC-E42F4020EF73}.Debug|x64.Build.0 = Debug|x64
 		{FCC058E6-590A-4FAF-8CDC-E42F4020EF73}.Debug|x86.ActiveCfg = Debug|Win32

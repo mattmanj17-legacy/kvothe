@@ -389,3 +389,69 @@ CNfaState * CNfa::PStateCreate()
 
 CNfaState CNfa::s_stateEmpty;
 
+void MatchNfa(string str, const CNfa & nfa)
+{
+	// id of the accepting state
+	
+	int nIdAccept = nfa.PStateAccept()->NId();
+	
+	// the current set of states to check for transitions
+	
+	CDynBitAry baryCur;
+	baryCur.SetSize(nfa.CState());
+	baryCur.Clear();
+
+	// states we can transition to on current chr
+	
+	CDynBitAry baryTemp;
+	baryTemp.SetSize(nfa.CState());
+	baryTemp.Clear();
+	
+	// init baryCur with the eclosure of the start state
+	
+	baryCur.Union(nfa.PStateStart()->EpsilonClosure());
+
+	// for each chr in the string
+
+	for(size_t iChr = 0; iChr < str.size(); ++iChr)
+	{
+		u8 chr = str[iChr];
+
+		bool fHasDest = false;
+		
+		// for each transition in the current eclosure
+
+		for(size_t iBit = 0; iBit < baryCur.C(); ++iBit)
+		{
+			if(baryCur.At(iBit))
+			{
+				const CNfaState * pNfaState = nfa.PStateFromId(iBit);
+
+				if(pNfaState->PStateTransition(chr))
+				{
+					// if this state can tranition on chr, add the destination state's eclosure to baryTemp
+					
+					fHasDest = true;
+					baryTemp.Union(pNfaState->PStateTransition(chr)->EpsilonClosure());
+				}
+			}
+		}
+
+		// we must accept this chr
+
+		assert(fHasDest);
+
+		// replace baryCur with baryTemp and clear baryTemp
+
+		baryCur.Clear();
+		baryCur.Union(&baryTemp);
+		baryTemp.Clear();
+	}
+
+	// we must end in an accepting state
+
+	assert(baryCur.At(nIdAccept));
+
+	return;
+}
+

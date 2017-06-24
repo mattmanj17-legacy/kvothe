@@ -34,3 +34,5 @@ private:
 	SDfaState *			m_pStateStart;	// the start state created in Build
 };
 
+void MatchDfa(string str, const CDfa & dfa);
+

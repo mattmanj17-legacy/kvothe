@@ -3,39 +3,41 @@
 #include "nfa.h"
 #include "dfa.h"
 #include "dfamin.h"
+#include "regexrand.h"
+#include <time.h>
+#include <string>
+#include <Windows.h>
 
 int main()
 {	
-	const char * pChzFileName = "example.regex";
-	FILE * pFile = fopen(pChzFileName, "r");
-			
-	//printf("regex ast:\n\n");
+	time_t t = time(nullptr);
+	srand((u32)t);
 	
-	CRegexParser parser;
-	parser.ParseFile(pFile);
-	//parser.PRegexAstParsed()->PrintDebug();
+	for(int i = 0; i < 10000; ++i)
+	{
+		CRegexRandom regexRand;
 
-	fclose(pFile);
+		SRegexAstNode regexAst = regexRand.RegexRandom();
 
-	printf("\n\nNFA:\n\n");
+		CNfa nfa;
+		nfa.Build(&regexAst);
 
-	CNfa nfa;
-	nfa.Build(parser.PRegexAstParsed());
-	//nfa.PrintDebug();
+		CDfa dfa;
+		dfa.Build(&nfa);
 
-	//printf("\nDFA:\n\n");
+		CDfa dfaMin;
+		CDfaMinimizer dfaminimizer;
+		dfaminimizer.Minimize(dfa, dfaMin);
 
-	CDfa dfa;
-	dfa.Build(&nfa);
-	//dfa.PrintDebug();
+		for(int j = 0; j < 10000; ++j)
+		{
+			string str = regexRand.StrRandFromRegex(regexAst);
 
-	CDfa dfaMin;
-
-	CDfaMinimizer dfaminimizer;
-
-	dfaminimizer.Minimize(dfa, dfaMin);
-
-	//dfaMin.PrintDebug();
-
+			MatchNfa(str, nfa);
+			MatchDfa(str, dfa);
+			MatchDfa(str, dfaMin);
+		}
+	}
+	
 	return 0;
 }

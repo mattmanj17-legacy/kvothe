@@ -325,3 +325,24 @@ void CDfa::Build(const CNfa * pNfa)
 	poolTempstate.Clear();
 	poolBaryEClosure.Clear();
 }
+
+void MatchDfa(string str, const CDfa & dfa)
+{
+	const SDfaState * pStateCur = dfa.PStateStart();
+
+	bool fHasDest = false;
+
+	for(size_t iChr = 0; iChr < str.size(); ++iChr)
+	{
+		u8 chr = str[iChr];
+
+		assert(pStateCur->m_transitions[chr]);
+		pStateCur = pStateCur->m_transitions[chr];
+	}
+
+	// we must end in an accepting state
+
+	assert(pStateCur->m_fIsFinal);
+
+	return;
+}
