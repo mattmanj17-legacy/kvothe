@@ -6,6 +6,9 @@ using std::vector;
 #include "types.h"
 #include "pool.h"
 
+#include <string>
+using std::string;
+
 // REGular EXpression Kind
 
 enum REGEXK
@@ -33,6 +36,8 @@ struct SRegexAstNode
 									}
 	
 	void							PrintDebug() const;
+	string							StrPretty() const;
+
 	
 	// regex data
 	
@@ -96,7 +101,7 @@ private:
 	u8						ChrConsume();				// return the current chr and read a new one
 	u8						ChrConsumeHex();			// check that the current chr is hex, then consume it
 	u8						ChrConsumeSet();			// check that the current chr is a valid set chr, then consume it
-	u8						ChrConsumeEscaped();		// check that the current chr is a vlid escape chr, then consume it
+	u8						ChrConsumeEscaped();		// check that the current chr is a valid escape chr, then consume it
 
 	int						NConsume();					// consume a base ten integer from input
 	

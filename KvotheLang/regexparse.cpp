@@ -3,8 +3,8 @@
 #include <assert.h>
 #include <ctype.h>
 
-#include <string>
-using std::string;
+#include <sstream>
+using std::ostringstream;
 
 void SRegexAstNode::PrintDebug() const
 {
@@ -60,6 +60,202 @@ void SRegexAstNode::PrintDebug() const
 			assert(false);
 			break;
 	}
+}
+
+string StrUnescape(u8 chr)
+{
+	if(chr == '\a')
+	{
+		return "\\a";
+	}
+	else if(chr == '\b')
+	{
+		return "\\b";
+	}
+	else if(chr == 27)
+	{
+		return "\\e";
+	}
+	else if(chr == '\f')
+	{
+		return "\\f";
+	}
+	else if(chr == '\n')
+	{
+		return "\\n";
+	}
+	else if(chr == '\r')
+	{
+		return "\\r";
+	}
+	else if(chr == '\t')
+	{
+		return "\\t";
+	}
+	else if(chr == '\v')
+	{
+		return "\\v";
+	}
+	else if(chr == '.')
+	{
+		return "\\.";
+	}
+	else if(chr == '\\')
+	{
+		return "\\\\";
+	}
+	else if(chr == '(')
+	{
+		return "\\(";
+	}
+	else if(chr == ')')
+	{
+		return "\\)";
+	}
+	else if(chr == '|')
+	{
+		return "\\|";
+	}
+	else if(chr == '*')
+	{
+		return "\\*";
+	}
+	else if(chr == '+')
+	{
+		return "\\+";
+	}
+	else if(chr == '?')
+	{
+		return "\\?";
+	}
+	else if(chr == '{')
+	{
+		return "\\{";
+	}
+	else if(chr == '}')
+	{
+		return "\\}";
+	}
+	else if(chr == '[')
+	{
+		return "\\[";
+	}
+	else if(chr == ']')
+	{
+		return "\\]";
+	}
+	else if(chr >= 1 && chr <= 26)
+	{
+		ostringstream strStreamRet;
+		strStreamRet << "\\c";
+		u8 chrUpper = chr + 'A' - 1;
+		strStreamRet << chrUpper;
+		return strStreamRet.str();
+	}
+	else if(chr >= ' ' && chr <= '~')
+	{
+		return string(1, chr);
+	}
+	else
+	{
+		ostringstream strStreamRet;
+		strStreamRet << "\\x" << std::hex << std::uppercase << (u32)chr;
+		return strStreamRet.str();
+	}
+}
+
+string StrUnescapeSet(u8 chr)
+{
+	if(chr == '-')
+		return "\\-";
+
+	return StrUnescape(chr);
+}
+
+string SRegexAstNode::StrPretty() const
+{
+	ostringstream strStreamRet;
+	
+	switch (m_regexk)
+	{
+		case REGEXK_Union:
+			{
+				for(int iRegex = 0; iRegex < m_pUnionData->m_aryRegex.size(); ++iRegex)
+				{
+					SRegexAstNode regex = m_pUnionData->m_aryRegex[iRegex];
+
+					if(iRegex > 0)
+					{
+						strStreamRet << "|";
+					}
+
+					strStreamRet << regex.StrPretty();
+				}
+			}
+			break;
+
+		case REGEXK_Concat:
+			{
+				for(SRegexAstNode regex : m_pConcatData->m_aryRegex)
+				{
+					if(regex.m_regexk == REGEXK_Union)
+					{
+						strStreamRet << '(';
+					}
+					
+					strStreamRet << regex.StrPretty();
+
+					if(regex.m_regexk == REGEXK_Union)
+					{
+						strStreamRet << ')';
+					}
+				}
+			}
+			break;
+
+		case REGEXK_Quant:
+			{
+				SRegexAstNode regex = m_pQuantData->m_regex;
+
+				if(regex.m_regexk == REGEXK_Union || regex.m_regexk == REGEXK_Concat)
+				{
+					strStreamRet << '(';
+				}
+
+				strStreamRet << m_pQuantData->m_regex.StrPretty();
+
+				if(regex.m_regexk == REGEXK_Union || regex.m_regexk == REGEXK_Concat)
+				{
+					strStreamRet << ')';
+				}
+
+				strStreamRet << "{" << m_pQuantData->m_cMic;
+				if(m_pQuantData->m_cMac != m_pQuantData->m_cMic)
+				{
+					strStreamRet << ",";
+					if(m_pQuantData->m_cMac != -1)
+					{
+						strStreamRet << m_pQuantData->m_cMac;
+					}
+				}
+				strStreamRet << "}";
+			}
+			break;
+
+		case REGEXK_Range:
+			strStreamRet << "[" << StrUnescapeSet(m_pRangeData->m_chrMic) << "-" << StrUnescapeSet(m_pRangeData->m_chrMac) << "]";
+			break;
+
+		case REGEXK_Chr:
+			strStreamRet << StrUnescape(m_pChrData->m_chr);
+			break;
+
+		default:
+			assert(false);
+			break;
+	}
+
+	return strStreamRet.str();
 }
 
 void CRegexParser::ParseFile(FILE * pFile)

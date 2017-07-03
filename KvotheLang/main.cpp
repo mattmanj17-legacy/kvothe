@@ -18,25 +18,11 @@ int main()
 		CRegexRandom regexRand;
 
 		SRegexAstNode regexAst = regexRand.RegexRandom();
-
-		CNfa nfa;
-		nfa.Build(&regexAst);
-
-		CDfa dfa;
-		dfa.Build(&nfa);
-
-		CDfa dfaMin;
-		CDfaMinimizer dfaminimizer;
-		dfaminimizer.Minimize(dfa, dfaMin);
-
-		for(int j = 0; j < 10000; ++j)
-		{
-			string str = regexRand.StrRandFromRegex(regexAst);
-
-			MatchNfa(str, nfa);
-			MatchDfa(str, dfa);
-			MatchDfa(str, dfaMin);
-		}
+		printf("%s", regexAst.StrPretty().c_str());
+		printf("\n\n");
+		string str = regexRand.StrRandFromRegex(regexAst);
+		printf("%s",str.c_str());
+		system("cls");
 	}
 	
 	return 0;

@@ -63,9 +63,9 @@ int ISegProb(vector<float> aryProb)
 	return aryProb.size() - 1;
 }
 
-const int g_cRegexDataMax = 100;
-const int g_nRegexDeapthMax = 15;
-static const int s_cMaxQuant = 2;
+const int g_cRegexDataMax = 15;
+const int g_nRegexDeapthMax = 200;
+static const int s_cMaxQuant = 10;
 
 int g_nRegexDeapth = 0;
 
