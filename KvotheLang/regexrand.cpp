@@ -152,6 +152,10 @@ std::string CRegexRandom::StrRandFromRegex(SRegexAstNode regexAst)
 			return std::string(1, regexAst.m_pChrData->m_chr);
 			break;
 
+		case REGEXK_Self:
+			return StrRandFromRegex(*regexAst.m_pRegexRoot);
+			break;
+
 		default:
 			assert(false);
 			return("");

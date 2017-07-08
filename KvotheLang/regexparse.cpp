@@ -12,7 +12,7 @@ void SRegexAstNode::PrintDebug() const
 	{
 		case REGEXK_Union:
 			{
-				printf("(UNION");
+				printf("(|");
 
 				for(SRegexAstNode regex : m_pUnionData->m_aryRegex)
 				{
@@ -26,7 +26,7 @@ void SRegexAstNode::PrintDebug() const
 
 		case REGEXK_Concat:
 			{
-				printf("(CONCAT");
+				printf("(+");
 
 				for(SRegexAstNode regex : m_pConcatData->m_aryRegex)
 				{
@@ -49,11 +49,15 @@ void SRegexAstNode::PrintDebug() const
 			break;
 
 		case REGEXK_Range:
-			printf("(%d '%c' - %d '%c')", m_pRangeData->m_chrMic, m_pRangeData->m_chrMic, m_pRangeData->m_chrMac, m_pRangeData->m_chrMac);
+			printf("(%d - %d)", m_pRangeData->m_chrMic, m_pRangeData->m_chrMac);
 			break;
 
 		case REGEXK_Chr:
-			printf("%d '%c'", m_pChrData->m_chr, m_pChrData->m_chr);
+			printf("%d", m_pChrData->m_chr, m_pChrData->m_chr);
+			break;
+
+		case REGEXK_Self:
+			printf("@");
 			break;
 
 		default:
@@ -143,6 +147,10 @@ string StrUnescape(u8 chr)
 	else if(chr == ']')
 	{
 		return "\\]";
+	}
+	else if(chr == '@')
+	{
+		return "\\@";
 	}
 	else if(chr >= 1 && chr <= 26)
 	{
@@ -250,6 +258,10 @@ string SRegexAstNode::StrPretty() const
 			strStreamRet << StrUnescape(m_pChrData->m_chr);
 			break;
 
+		case REGEXK_Self:
+			strStreamRet << '@';
+			break;
+
 		default:
 			assert(false);
 			break;
@@ -266,7 +278,7 @@ void CRegexParser::ParseFile(FILE * pFile)
 
 	m_chrCur = (u8)fgetc(m_pFile);	
 	
-	m_regexAstParsed = RegexParse();
+	m_regexAstParsed = UnionParse();
 
 	assert(fgetc(m_pFile) == EOF);
 }
@@ -277,17 +289,6 @@ const SRegexAstNode * CRegexParser::PRegexAstParsed()
 		return &m_regexAstParsed;
 	else
 		return nullptr;
-}
-
-SRegexAstNode CRegexParser::RegexParse()
-{
-	MatchChr('(');
-
-	SRegexAstNode unionAst = UnionParse();
-
-	MatchChr(')');
-
-	return unionAst;
 }
 
 SRegexAstNode CRegexParser::UnionParse()
@@ -435,7 +436,13 @@ SRegexAstNode CRegexParser::AtomParse()
 {
 	if(ChrPeek() == '(')
 	{
-		return RegexParse();
+		MatchChr('(');
+
+		SRegexAstNode unionAst = UnionParse();
+
+		MatchChr(')');
+
+		return unionAst;
 	}
 	else if(ChrPeek() == '[')
 	{
@@ -452,6 +459,12 @@ SRegexAstNode CRegexParser::AtomParse()
 		pRangeData->m_chrMac = 255;
 
 		return regexRange;
+	}
+	else if(ChrPeek() == '@')
+	{
+		MatchChr('@');
+
+		return RegexCreate(REGEXK_Self);
 	}
 	else if(ChrPeek() == '\\')
 	{
@@ -669,7 +682,8 @@ u8 CRegexParser::ChrConsumeEscaped()
 			chrEscape == '{' ||
 			chrEscape == '}' || 
 			chrEscape == '[' ||
-			chrEscape == ']'
+			chrEscape == ']' ||
+			chrEscape == '@'
 		);
 
 		return chrEscape;
@@ -750,6 +764,10 @@ SRegexAstNode CRegexParser::RegexCreate(REGEXK regexk)
 
 		case REGEXK_Chr:
 			regex.m_pChrData = m_poolRegexData.PTNew<SChrRegexData>();
+			break;
+
+		case REGEXK_Self:
+			regex.m_pRegexRoot = &m_regexAstParsed;
 			break;
 
 		default:

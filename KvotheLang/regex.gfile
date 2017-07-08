@@ -1,9 +1,5 @@
 regexFile
-	: regex EOF
-	;
-
-regex
-	: '(' union ')'
+	: union EOF
 	;
 
 union
@@ -29,11 +25,12 @@ int
 	;
 
 atom
-	: regex
+	: '(' union ')'
 	| set
 	| '.'
+	| '@'
 	| escapedChr
-	| [^.\\()|*+?{}\[\]\cA-\cZ]
+	| [^@.\\()|*+?{}\[\]\cA-\cZ]
 	;
 
 escapedChr
@@ -61,6 +58,7 @@ escapedChr
 		| '}'
 		| '['
 		| ']'
+		| '@'
 		)
 	;
 

@@ -201,6 +201,8 @@ CNfa::SNfaFragment CNfa::FragFromRegex(const SRegexAstNode * pRegex)
 			return FragFromChr(pRegex->m_pChrData);
 			break;
 
+		// we do not suport @ yet
+
 		default:
 			assert(false);
 			return SNfaFragment();

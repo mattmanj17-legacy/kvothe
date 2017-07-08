@@ -18,6 +18,7 @@ enum REGEXK
 	REGEXK_Quant,
 	REGEXK_Range,
 	REGEXK_Chr,
+	REGEXK_Self,
 	REGEXK_Nil,
 };
 
@@ -48,6 +49,7 @@ struct SRegexAstNode
 		SQuantifierRegexData *		m_pQuantData;
 		SRangeRegexData *			m_pRangeData;
 		SChrRegexData *				m_pChrData;
+		SRegexAstNode *				m_pRegexRoot;
 	};
 
 	REGEXK							m_regexk;		// what type of regex is this
@@ -91,7 +93,6 @@ public:
 
 private:
 
-	SRegexAstNode			RegexParse();					
 	SRegexAstNode			UnionParse();					
 	SRegexAstNode			ConcatParse();					
 	SRegexAstNode			QuantParse();					
