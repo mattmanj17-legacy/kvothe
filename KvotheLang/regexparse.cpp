@@ -53,7 +53,7 @@ void SRegexAstNode::PrintDebug() const
 			break;
 
 		case REGEXK_Chr:
-			printf("%d", m_pChrData->m_chr, m_pChrData->m_chr);
+			printf("%d", m_pChrData->m_chr);
 			break;
 
 		case REGEXK_Self:
@@ -188,7 +188,7 @@ string SRegexAstNode::StrPretty() const
 	{
 		case REGEXK_Union:
 			{
-				for(int iRegex = 0; iRegex < m_pUnionData->m_aryRegex.size(); ++iRegex)
+				for(size_t iRegex = 0; iRegex < m_pUnionData->m_aryRegex.size(); ++iRegex)
 				{
 					SRegexAstNode regex = m_pUnionData->m_aryRegex[iRegex];
 
@@ -767,7 +767,6 @@ SRegexAstNode CRegexParser::RegexCreate(REGEXK regexk)
 			break;
 
 		case REGEXK_Self:
-			regex.m_pRegexRoot = &m_regexAstParsed;
 			break;
 
 		default:

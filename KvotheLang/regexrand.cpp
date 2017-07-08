@@ -89,33 +89,51 @@ SRegexAstNode CRegexRandom::RegexRandom()
 
 std::string CRegexRandom::StrRandFromRegex(SRegexAstNode regexAst)
 {
+	static const int s_nDeapthMax = 1000;
+
+	static const int s_cLengthMax = 2000;
+
+	if(m_nDepthCur > s_nDeapthMax)
+	{
+		m_cLengthCur = s_cLengthMax;
+		return "!SOE!";
+	}
+	
+	if(m_pRegexRoot == nullptr)
+	{
+		m_pRegexRoot = &regexAst;
+	}
+
+	std::string strRet = "";
+
+	m_nDepthCur++;
+	
 	switch (regexAst.m_regexk)
 	{
 		case REGEXK_Union:
 			{
 				int iRegexRand = TRand<int>(0, regexAst.m_pUnionData->m_aryRegex.size());
 
-				return StrRandFromRegex(regexAst.m_pUnionData->m_aryRegex[iRegexRand]);
+				strRet = StrRandFromRegex(regexAst.m_pUnionData->m_aryRegex[iRegexRand]);
 			}
 			break;
 
 		case REGEXK_Concat:
 			{
-				std::string strRet = "";
-
 				for(SRegexAstNode regex : regexAst.m_pConcatData->m_aryRegex)
 				{
 					strRet += StrRandFromRegex(regex);
-				}
 
-				return strRet;
+					if(m_nDepthCur > s_nDeapthMax)
+					{
+						break;
+					}
+				}
 			}
 			break;
 
 		case REGEXK_Quant:
 			{
-				std::string strRet = "";
-
 				SRegexAstNode regex = regexAst.m_pQuantData->m_regex;
 			
 				int cMic = regexAst.m_pQuantData->m_cMic;
@@ -127,40 +145,62 @@ std::string CRegexRandom::StrRandFromRegex(SRegexAstNode regexAst)
 				{
 					cQuant++;
 					strRet += StrRandFromRegex(regex);
+
+					if(m_nDepthCur > s_nDeapthMax)
+					{
+						break;
+					}
 				}
 
 				static const float s_uProbQuantStrContinue = 0.5;
 
-				while((cMac == -1 || cQuant < cMac) && FProb(s_uProbQuantStrContinue, true))
+				while((cMac == -1 || cQuant < cMac) && FProb(s_uProbQuantStrContinue, m_cLengthCur < s_cLengthMax))
 				{
 					cQuant++;
 					strRet += StrRandFromRegex(regex);
-				}
 
-				return strRet;
+					if(m_nDepthCur > s_nDeapthMax)
+					{
+						break;
+					}
+				}
 			}
 			break;
 
 		case REGEXK_Range:
 			{
 				u8 chrRand = TRand<u8>(regexAst.m_pRangeData->m_chrMic, regexAst.m_pRangeData->m_chrMac);
-				return std::string(1, chrRand);
+				strRet = std::string(1, chrRand);
+				m_cLengthCur++;
 			}
 			break;
 
 		case REGEXK_Chr:
-			return std::string(1, regexAst.m_pChrData->m_chr);
+			strRet = std::string(1, regexAst.m_pChrData->m_chr);
+			m_cLengthCur++;
 			break;
 
 		case REGEXK_Self:
-			return StrRandFromRegex(*regexAst.m_pRegexRoot);
+			strRet = StrRandFromRegex(*m_pRegexRoot);
 			break;
 
 		default:
 			assert(false);
-			return("");
 			break;
 	}
+
+	if(m_nDepthCur <= s_nDeapthMax)
+	{
+		m_nDepthCur--;
+	}
+	
+	if(m_pRegexRoot == &regexAst)
+	{
+		m_pRegexRoot = nullptr;
+		m_cLengthCur = 0;
+	}
+
+	return strRet;
 }
 
 SRegexAstNode CRegexRandom::UnionRandom()
@@ -305,7 +345,7 @@ SRegexAstNode CRegexRandom::QuantRandom()
 SRegexAstNode CRegexRandom::AtomRandom()
 {
 	g_nRegexDeapth++;
-	int iSeg = ISegProb({0.75f, 0.2f, 0.01f, 0.04f});
+	int iSeg = ISegProb({0.5f, 0.2f, 0.01f, 0.26f, 0.03f});
 	
 	if(iSeg == 0 && FALLOWTRUE)
 	{
@@ -328,6 +368,11 @@ SRegexAstNode CRegexRandom::AtomRandom()
 		g_nRegexDeapth--;
 		return regexRange;
 	}
+	else if(iSeg == 3)
+	{	
+		g_nRegexDeapth--;
+		return RegexCreate(REGEXK_Self);
+	}
 	else
 	{
 		SRegexAstNode regexChr = RegexCreate(REGEXK_Chr);
@@ -341,13 +386,14 @@ SRegexAstNode CRegexRandom::AtomRandom()
 SRegexAstNode CRegexRandom::SetRandom()
 {
 	g_nRegexDeapth++;
+
 	// check if this set is a negation
 	
 	bool fNegate = false;
 
 	if(FProb(s_uProbNegate, true))
 	{
-		//fNegate = true;
+		fNegate = true;
 	}
 
 	// store elements of this set in a map from chr to bool (to convert to ranges later)
@@ -460,6 +506,9 @@ SRegexAstNode CRegexRandom::RegexCreate(REGEXK regexk)
 
 		case REGEXK_Chr:
 			regex.m_pChrData = m_poolRegexData.PTNew<SChrRegexData>();
+			break;
+
+		case REGEXK_Self:
 			break;
 
 		default:

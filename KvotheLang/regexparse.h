@@ -49,7 +49,6 @@ struct SRegexAstNode
 		SQuantifierRegexData *		m_pQuantData;
 		SRangeRegexData *			m_pRangeData;
 		SChrRegexData *				m_pChrData;
-		SRegexAstNode *				m_pRegexRoot;
 	};
 
 	REGEXK							m_regexk;		// what type of regex is this
